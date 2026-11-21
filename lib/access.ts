@@ -1,11 +1,11 @@
 /**
  * Who may do what. Permissions are owned by the code (every key below is checked somewhere),
  * so this list is the source of truth and is synced into the `permissions` table on start.
- * Roles are data: the system roles below are seeded once, and the owner can change the
- * non-owner ones later. The Owner role always holds every permission.
+ * Roles are data: the system roles below are seeded once, and an admin can change the
+ * non-admin ones later. The Admin role always holds every permission.
  *
- * The default matrix is our sensible default, not the client's decision (open point in
- * docs/PROGRESS.md).
+ * Roles agreed with Utsav (2026-11-21): admin, office, driver, helper. What each may do is our
+ * sensible default, not the client's decision (open point in docs/PROGRESS.md).
  */
 
 export const PERMISSIONS = [
@@ -15,7 +15,10 @@ export const PERMISSIONS = [
   "challans.edit",
   "challans.cancel",
   "trips.view",
-  "trips.manage", // new trip, load / unload, advance status, deliver
+  "trips.manage", // new / edit trip, correct a status
+  "trips.load", // put parcels on a loading truck, take them off
+  "trips.advance", // truck has left, truck has arrived, close
+  "trips.deliver", // mark a parcel delivered, collecting To-Pay money in the same tap
   "parties.view",
   "parties.manage",
   "payments.record",
@@ -37,46 +40,56 @@ export const PERMISSIONS = [
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
-export const SYSTEM_ROLES = ["owner", "manager", "accountant", "booking_clerk"] as const;
+export const SYSTEM_ROLES = ["admin", "office", "driver", "helper"] as const;
 export type SystemRole = (typeof SYSTEM_ROLES)[number];
 
-/** Permissions each system role starts with. Owner is "everything" and is never stored short. */
+export const ROLE_NAMES = {
+  admin: "Admin",
+  office: "Office",
+  driver: "Driver",
+  helper: "Helper",
+} as const satisfies Record<SystemRole, string>;
+
+/**
+ * Permissions each system role starts with.
+ * - admin: everything (never stored short; topped up on every start).
+ * - office: the day's desk work. Cancelling money records, salaries, settings, backups,
+ *   change history and logins stay with the admin.
+ * - driver: their road work: see trips and parcels, mark left / arrived, deliver and collect.
+ * - helper: loading: see trips and parcels, load and unload.
+ */
 export const DEFAULT_ROLE_PERMISSIONS = {
-  owner: PERMISSIONS,
-  manager: PERMISSIONS.filter(
-    (p) => p !== "users.manage" && p !== "settings.manage" && p !== "backup.download",
-  ),
-  accountant: [
-    "challans.view",
-    "trips.view",
-    "parties.view",
-    "parties.manage",
-    "payments.record",
-    "payments.cancel",
-    "expenses.view",
-    "expenses.record",
-    "expenses.cancel",
-    "salary.view",
-    "salary.manage",
-    "gst.view",
-    "reports.view",
-    "reports.export",
-    "audit.view",
-  ],
-  booking_clerk: [
+  admin: PERMISSIONS,
+  office: [
     "challans.view",
     "challans.book",
     "challans.edit",
     "trips.view",
     "trips.manage",
+    "trips.load",
+    "trips.advance",
+    "trips.deliver",
     "parties.view",
+    "parties.manage",
     "payments.record",
+    "expenses.view",
     "expenses.record",
+    "gst.view",
+    "reports.view",
+    "reports.export",
+    "masters.manage",
   ],
+  driver: ["challans.view", "trips.view", "trips.advance", "trips.deliver"],
+  helper: ["challans.view", "trips.view", "trips.load"],
 } as const satisfies Record<SystemRole, readonly Permission[]>;
 
 export function isPermission(value: string): value is Permission {
   const all: readonly string[] = PERMISSIONS;
+  return all.includes(value);
+}
+
+export function isSystemRole(value: string | null): value is SystemRole {
+  const all: readonly (string | null)[] = SYSTEM_ROLES;
   return all.includes(value);
 }
 

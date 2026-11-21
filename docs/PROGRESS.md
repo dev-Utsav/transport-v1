@@ -48,11 +48,11 @@ After the demo the client asked for admin access, which means separate logins. T
 - **Migration `drizzle/0002_access_rbac.sql`** (additive only, nothing existing changes shape):
   - new tables `users`, `roles`, `permissions`, `role_permissions` and `user_roles`;
   - `audit_log.actor_id` records who made each change.
-- **`lib/access.ts`** holds the permission catalog (23 keys, `as const`), the 4 system roles and their default matrix.
+- **`lib/access.ts`** holds the permission catalog (26 keys, `as const`), the 4 system roles (admin, office, driver, helper) and their default matrix. System roles the code drops are switched off on start.
 - **`server/db/access.ts`** `ensureAccessCatalog()` runs on start (real and practice desks):
   - syncs permission keys (keys the code drops are retired, not deleted);
   - creates any missing system roles with their defaults;
-  - tops Owner up to every permission.
+  - tops Admin up to every permission.
 - **`lib/password.ts`**: scrypt hashes from node:crypto, no new dependency. Parameters are stored with each hash.
 - **Backup** now includes the access tables. Users are included **without password hashes**.
 - **Checks:** `pnpm check` passes with 40 tests; all 3 migrations apply to a fresh PGlite.
@@ -63,13 +63,13 @@ After the demo the client asked for admin access, which means separate logins. T
 2. Replace `assertAdmin()` with `assertCan(permission)` in every action and API route, and hide nav items and buttons the user can't use.
 3. `logChange()` writes `actorId`.
 4. Settings → Users and roles screen (Office work), plus "change password on first sign-in".
-5. Bootstrap: when `users` is empty, the first sign-in with `APP_PASSWORD` creates the Owner, then `APP_PASSWORD` stops working.
+5. Bootstrap: when `users` is empty, the first sign-in with `APP_PASSWORD` creates the Admin, then `APP_PASSWORD` stops working.
 6. Practice desk: a sample owner, plus the tour steps re-checked.
 7. Supabase: enable RLS (no policies) on all public tables, so the Data API can't read them. The app connects as the DB owner, so it is unaffected.
 
 ### Open points with the client
 
-8. Which roles they need and what each may do. Default: Owner / Manager / Accountant / Booking clerk; matrix in `lib/access.ts`.
+8. **Roles decided (Utsav, 2026-11-21): admin, office, driver, helper** (`lib/access.ts`). Still open with the client: what each may do. Defaults: admin = everything; office = desk work, but no cancelling money records, salaries, settings, backups, history or logins; driver = see trips and parcels, left / arrived, deliver and collect; helper = see trips and parcels, load and unload. Trip permissions are split into `trips.manage` / `trips.load` / `trips.advance` / `trips.deliver` for this. Also open: should a driver see only their own trips? That would use `users.employee_id` → `trips.driver_id`.
 9. Do drivers get a login (e.g. to mark delivered)? `users.employee_id` allows it.
 
 ## 2026-11-20 (later): one flow everywhere, practice desk, guided tour
