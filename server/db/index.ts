@@ -27,6 +27,13 @@ export async function getDb(): Promise<Database> {
   return (await isPracticeRequest()) ? getPracticeDb() : getRealDb();
 }
 
+/** Integration tests hand in their own in-memory databases (tests/fixtures/db.ts). */
+export function setDatabasesForTest(real: Database, practice: Database): void {
+  if (process.env.NODE_ENV !== "test") throw new Error("Test databases only under NODE_ENV=test.");
+  handles.real = Promise.resolve(real);
+  handles.practice = Promise.resolve(practice);
+}
+
 export function getRealDb(): Promise<Database> {
   // A failed start isn't remembered: the next request tries again.
   handles.real ??= connectReal().catch((err: unknown) => {
@@ -75,7 +82,10 @@ async function pgliteDb(folder: string): Promise<Database> {
   const { PGlite } = await import("@electric-sql/pglite");
   const { drizzle } = await import("drizzle-orm/pglite");
   const { migrate } = await import("drizzle-orm/pglite/migrator");
-  const dataDir = path.join(process.cwd(), ".data");
+  // TD_DATA_DIR lets the E2E run use its own throwaway folder instead of the dev data.
+  const dataDir = process.env.TD_DATA_DIR
+    ? path.resolve(process.env.TD_DATA_DIR)
+    : path.join(process.cwd(), ".data");
   mkdirSync(dataDir, { recursive: true });
   const db = drizzle({ client: new PGlite(path.join(dataDir, folder)), schema });
   await migrate(db, { migrationsFolder: path.join(process.cwd(), "drizzle") });

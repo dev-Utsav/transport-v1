@@ -1,6 +1,6 @@
 "use server";
 
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
@@ -227,7 +227,7 @@ export async function cancelChallan(formData: FormData): Promise<void> {
     const linked = await tx
       .update(payments)
       .set({ isCancelled: true })
-      .where(eq(payments.challanId, id))
+      .where(and(eq(payments.challanId, id), eq(payments.isCancelled, false)))
       .returning({ id: payments.id });
     for (const p of linked)
       await logChange(tx, "payment", p.id, "cancel", null, {

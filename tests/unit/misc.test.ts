@@ -30,6 +30,17 @@ describe("csv and numbering", () => {
   it("quotes cells that need it and starts with a BOM", () => {
     expect(toCsv(["a", "b"], [["x,y", 'say "hi"']])).toBe('﻿a,b\r\n"x,y","say ""hi"""\r\n');
   });
+  it("keeps text that looks like a formula as text, but not negative amounts", () => {
+    const csv = toCsv(
+      ["name", "amt"],
+      [
+        ['=HYPERLINK("x")', "-1500.00"],
+        ["@SUM(A1)", "+5"],
+      ],
+    );
+    expect(csv).toContain(`"'=HYPERLINK(""x"")",-1500.00`);
+    expect(csv).toContain("'@SUM(A1),+5");
+  });
   it("pads the serial", () => {
     expect(formatChallanNo(42, "KDR/")).toBe("KDR/0042");
     expect(formatChallanNo(12345, "")).toBe("12345");

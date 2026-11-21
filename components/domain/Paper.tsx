@@ -25,11 +25,12 @@ export function Letterhead({
   fallbackName: string;
 }) {
   return (
-    <header className="flex items-start justify-between gap-6 border-b-2 border-ink pb-4">
+    <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3 border-b-2 border-ink pb-4">
       <div className="grid gap-0.5">
-        <h1 className="text-[22px] font-bold tracking-tight">
+        {/* Not a heading: every page with a letterhead already has its one h1 in PageHead. */}
+        <p className="text-[22px] font-bold tracking-tight">
           {settings.businessName || fallbackName}
-        </h1>
+        </p>
         {settings.address ? <p>{settings.address}</p> : null}
         <p>
           {[settings.phone, settings.gstin ? `GSTIN ${settings.gstin}` : ""]

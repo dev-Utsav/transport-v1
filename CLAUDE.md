@@ -24,7 +24,7 @@ These rules are the Sigma Marketing website rules (`~/Downloads/Personal/Sigma M
 - **Tailwind CSS 4** (`@theme static` in `app/globals.css`), no UI kits, no CSS-in-JS.
 - **Postgres via Drizzle ORM.** Live: Supabase (Mumbai, Session pooler) through `DATABASE_URL`. Local: embedded PGlite in `.data/` (no setup). Migrations in `drizzle/` (`pnpm db:generate`, `pnpm db:migrate` for the live DB).
 - **Zod** at every boundary (form data, search params, env). **No animation library**: CSS transitions only (Sigma allowed GSAP for marketing motion; a ledger tool doesn't need it).
-- pnpm, Node 24 (`.nvmrc`), Vitest for `lib/`. Hosting: Vercel, region `bom1`, nightly backup cron in `vercel.json`.
+- pnpm, Node 24 (`.nvmrc`). Tests: Vitest (unit + integrated) and Playwright (end-to-end), local only, see §11. Hosting: Vercel, region `bom1`, nightly backup cron in `vercel.json`.
 - **Adding a dependency needs a reason** (bundle cost, what the platform already does). Excel export is CSV with a BOM (opens in Excel, keeps Hindi); PDF is the browser's print → Save as PDF. Both deliberately avoid a library.
 
 ## 3. Project structure
@@ -46,6 +46,12 @@ server/
   queries/           reads, one file per area
   actions/           "use server" mutations, one file per area
 proxy.ts             the login guard (Next 16 name for middleware)
+tests/
+  unit/              pure lib/ functions (Vitest project "unit")
+  integrated/        server actions + queries on a fresh in-memory PGlite per test (project "integrated")
+  end-to-end/        Playwright specs against a production build on :3300
+  fixtures/          test DB (db.ts), seed builders (factories.ts), Next mocks, signals
+  .env.test          loaded by the integrated setup (git-ignored)
 ```
 
 - One component per file, named export, file name = component name. Import with `@/`.
@@ -133,9 +139,14 @@ Semantic HTML, one `h1` per page, labels on every field, errors tied with `aria-
 - Secrets only in Vercel env vars; `.env*` ignored; `.env.example` lists names. The live tool refuses to start without `DATABASE_URL` (never falls back to a throwaway disk DB).
 - Nightly backup (`/api/cron/backup`, `CRON_SECRET`) keeps the last 30 gzip snapshots in the DB; Settings → Backup downloads one any time.
 
-## 11. Checks
+## 11. Checks and tests (local only, no CI)
 
-`pnpm check` = typecheck + lint (0 warnings) + tests + build. Then Chrome at 390 and 1440, English and Hindi, a no-JS pass on any changed form. Local demo data: `SEED_DEMO=1 pnpm dev` on an empty `.data/` (delete `.data/` to start fresh).
+- `pnpm check` = typecheck + lint (0 warnings) + unit + integrated tests + build. Run it before saying anything is done.
+- `pnpm test:e2e` (Playwright) before every deploy and after any screen change: builds, starts on :3300 with its own database in `.data/e2e` (wiped and seeded each run), installed Chrome, phone 390 + desktop 1440, English + Hindi. Report: `.data/e2e-report`.
+- **Test databases never touch real data:** integrated tests use in-memory PGlite (a snapshot of the real migrations, one copy per test, `setDatabasesForTest`, refused unless `NODE_ENV=test`); E2E uses `TD_DATA_DIR=.data/e2e` with `DATABASE_URL` blanked. Dev data in `.data/pglite` is never used by tests.
+- **Every bug fix gets a test that failed before the fix.** New actions get an integrated test (rows written, totals, audit entry, refused input); new screens go in `tests/end-to-end/screens.spec.ts`.
+- Seed data: build only what a test needs with `tests/fixtures/factories.ts`; E2E uses the sample data in `server/db/sample.ts`.
+- Then still look at changed screens yourself in Chrome, and do a no-JS pass on any changed form.
 
 ## 12. Git
 

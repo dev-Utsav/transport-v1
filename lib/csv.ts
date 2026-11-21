@@ -4,7 +4,11 @@ export function toCsv(
   rows: readonly (readonly (string | number)[])[],
 ): string {
   const cell = (v: string | number) => {
-    const s = String(v);
+    let s = String(v);
+    // A text cell starting with = + - @ (or tab / CR) would run as a formula in Excel
+    // (e.g. a party named =HYPERLINK(...)): prefix a quote so it stays text. Plain numbers
+    // such as a loss "-1500.00" are left alone so Excel can still sum them.
+    if (/^[=+\-@\t\r]/.test(s) && !/^[+-]?\d+(\.\d+)?$/.test(s)) s = `'${s}`;
     return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const lines = [header, ...rows].map((row) => row.map(cell).join(","));

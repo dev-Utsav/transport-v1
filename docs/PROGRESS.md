@@ -2,6 +2,43 @@
 
 Newest entry at the top. Rules: `../CLAUDE.md`. Client brief: `Transport Management System Feature Document.docx` (this folder).
 
+## 2026-11-21 (later): local testing setup (unit, integrated, end-to-end)
+
+The backend consultant asked for tests with a separate test database and seed data, local only (no CI). Everything was committed first (`fc4bd2e`).
+
+### Set up
+
+- **Unit** (`tests/unit/`, Vitest project `unit`): the 11 existing `lib/` test files, moved from `lib/`.
+- **Integrated** (`tests/integrated/`, project `integrated`):
+  - server actions and queries run against **in-memory PGlite**: migrated once per file, then a fresh copy per test;
+  - Next's `cookies` / `headers` / `redirect` / `revalidatePath` / `server-only` are mocked (`tests/fixtures/next-mocks.ts`);
+  - reads `tests/.env.test`.
+- **End-to-end** (`tests/end-to-end/`, Playwright 1.65.0, the only new dependency):
+  - runs a production build on :3300 against `.data/e2e` (wiped and seeded every run), in the installed Chrome at phone 390 and desktop 1440;
+  - covers login, every screen in English and Hindi (200 status, one h1, no console errors, no sideways scroll), and challan booking and a refused save with JS off.
+- **Seams in app code:**
+  - `setDatabasesForTest()` in `server/db/index.ts` (refused unless `NODE_ENV=test`);
+  - `TD_DATA_DIR` for the PGlite folder.
+- **Scripts:** `test`, `test:unit`, `test:int`, `test:e2e`, `test:all`.
+
+### Bugs the tests caught (fixed, each with its test)
+
+1. **Cancelling a challan re-cancelled payments that were already cancelled**, writing duplicate cancel entries into the change history (`server/actions/challans.ts`).
+2. **CSV formula injection:** a party named `=HYPERLINK(...)` became a live formula in Excel. Text cells starting with `= + - @` now get a `'` prefix, and plain numbers such as `-1500.00` are left alone so Excel still sums them (`lib/csv.ts`).
+3. **Two `<h1>` headings** on the salary register, salary slip, challan print and loading memo: the letterhead name is now a paragraph.
+4. **On phones, the salary register and slip scrolled sideways**: the letterhead badge couldn't wrap. The header wraps now.
+
+### Verified
+
+- `pnpm check` passes: 61 unit + integrated tests, about 4 s.
+- `pnpm test:e2e`: 125 passed.
+
+### Not covered yet (next tests to write)
+
+- Trips (load / unload after departure, status backwards), expenses with a photo (size, fake type), salary edge months, reports totals versus the ledger, the practice desk never writing to real data, login rate limiting.
+- The guided tour as an E2E spec.
+- Concurrency (two bookings at once) needs real Postgres; PGlite has one connection.
+
 ## 2026-11-21: users, roles and permissions (database layer)
 
 After the demo the client asked for admin access, which means separate logins. The backend consultant asked for the database to have users, roles, permissions, role permissions and user roles.
