@@ -1,0 +1,181 @@
+# Transport Desk: progress log
+
+Newest entry at the top. Rules: `../CLAUDE.md`. Client brief: `Transport Management System Feature Document.docx` (this folder).
+
+## 2026-11-21: users, roles and permissions (database layer)
+
+After the demo the client asked for admin access, which means separate logins. The backend consultant asked for the database to have users, roles, permissions, role permissions and user roles.
+
+### Done
+
+- **Migration `drizzle/0002_access_rbac.sql`** (additive only, nothing existing changes shape):
+  - new tables `users`, `roles`, `permissions`, `role_permissions` and `user_roles`;
+  - `audit_log.actor_id` records who made each change.
+- **`lib/access.ts`** holds the permission catalog (23 keys, `as const`), the 4 system roles and their default matrix.
+- **`server/db/access.ts`** `ensureAccessCatalog()` runs on start (real and practice desks):
+  - syncs permission keys (keys the code drops are retired, not deleted);
+  - creates any missing system roles with their defaults;
+  - tops Owner up to every permission.
+- **`lib/password.ts`**: scrypt hashes from node:crypto, no new dependency. Parameters are stored with each hash.
+- **Backup** now includes the access tables. Users are included **without password hashes**.
+- **Checks:** `pnpm check` passes with 40 tests; all 3 migrations apply to a fresh PGlite.
+
+### Not done yet (the app still logs in with the one shared `APP_PASSWORD`)
+
+1. Login by user (login + password), with a session token carrying `userId` and `sessionVersion`, checked against the DB on each action.
+2. Replace `assertAdmin()` with `assertCan(permission)` in every action and API route, and hide nav items and buttons the user can't use.
+3. `logChange()` writes `actorId`.
+4. Settings → Users and roles screen (Office work), plus "change password on first sign-in".
+5. Bootstrap: when `users` is empty, the first sign-in with `APP_PASSWORD` creates the Owner, then `APP_PASSWORD` stops working.
+6. Practice desk: a sample owner, plus the tour steps re-checked.
+7. Supabase: enable RLS (no policies) on all public tables, so the Data API can't read them. The app connects as the DB owner, so it is unaffected.
+
+### Open points with the client
+
+8. Which roles they need and what each may do. Default: Owner / Manager / Accountant / Booking clerk; matrix in `lib/access.ts`.
+9. Do drivers get a login (e.g. to mark delivered)? `users.employee_id` allows it.
+
+## 2026-11-20 (later): one flow everywhere, practice desk, guided tour
+
+Utsav: the flow felt confusing. He wanted one flow that every step and screen follows, anything else they need, and an interactive tour that waits for the user to act before moving on.
+
+### Why it felt confusing (before)
+
+- Trips and challans were separate islands: putting parcels on a truck meant editing each challan.
+- Delivery and collection were buried in status buttons.
+- Home showed four equal shortcuts with no order.
+- Nothing told the admin what comes next.
+
+### Changed
+
+- **One five-step flow** (`lib/flow.ts`, tested): Book → Load → On the road → Deliver → Collect.
+  - Home is now a **work board** (`FlowBoard`): each step shows what is waiting and one button. "Office work" (expenses, payment, salary, reports) sits below it.
+  - **`FlowBar`** ("you are here") is on New challan, challan, trip, new trip, record payment and reminders.
+  - **Challan "Next step" card** (`NextStep`) shows one action for each state:
+    - load it on a truck that is loading (one tap), or start a new trip with it;
+    - open the trip;
+    - mark delivered;
+    - collect (Cash / UPI / Bank);
+    - done.
+  - **Trip screen by stage:**
+    - the road card has one big next-action button (`advanceTrip`): Truck has left → Arrived → Close;
+    - while loading, a **loading checklist** of waiting parcels, those for the same destination first (`LoadPanel`, `loadOnTrip`), and "Take off truck";
+    - once arrived, a **delivery checklist** where each parcel is delivered, with To-Pay money taken in the same tap (`deliverChallan`);
+    - the old status row sits under "Correct the status".
+  - **Trips list** is grouped in flow order: Loading, On the road, Arrived (deliver), Closed.
+  - **Start a trip from a parcel:** `/trips/new?challan=` loads it on save.
+- **Added because a transport office needs it:**
+  - a **loading memo** to print for the driver (`/trips/[id]/print`), with To-Pay money to collect;
+  - a **WhatsApp payment receipt** after recording a payment;
+  - **Truck hire** as an expense category;
+  - a **Getting started** checklist on an empty real desk;
+  - **Add to Home screen** (`app/manifest.ts`).
+- **Practice desk** (separate database with sample data, banner, Start over, Back to my desk). Open it from More or Settings ("Take the tour" / "Practice desk") or from Getting started.
+- **Guided tour**, 27 steps (`lib/tour.ts`, `components/tour/*`):
+  - Spotlight and talk bubble; each step waits for the real action (tap, pick, type).
+  - Survives page changes and server redirects, and offers "Take me there" if the person wanders off.
+  - Escape pauses it, and "End tour" is always visible.
+  - Hindi + English.
+
+### Verified
+
+- `pnpm check` passes: 37 tests and the build.
+- The **full tour was run in Chrome at 390 and 1440 px**: a real challan was booked, loaded, dispatched, arrived and delivered with money on the practice desk; then party, ledger, office, language, and Finish back to the real desk. No console errors.
+- Hindi tour and screens: no horizontal overflow.
+- Regression flows still pass, including **booking a challan with JS off**.
+- **Fixed during checks:** a delivery row overflowed on phones (grid column min-width), now guarded globally with `fieldset { min-width: 0 }` and `minmax(0,1fr)` rows.
+
+### Not verified
+
+- The practice `search_path` on Supabase's pooler. The code refuses (rather than touching real data) if it isn't honoured; if so, use the direct connection for practice.
+- Lighthouse, still blocked by auto mode.
+- A real phone.
+- Native-speaker check of the new Hindi tour text.
+
+### Next
+
+1. Utsav walks the tour: More → Take the tour.
+2. Send the client the open points below, plus a screen recording of the tour.
+3. Deploy: Utsav will do it later (said 2026-11-20). Steps are in README → Deploy; afterwards, test the practice desk on Supabase and run Lighthouse.
+
+## 2026-11-20: Phase 1 built (local)
+
+**State:** every Phase 1 screen in the feature document is built and runs locally on the embedded database. Branch `build/phase-1`, **nothing committed yet**, not deployed.
+
+### What's built (feature doc section → where)
+
+| Doc        | Feature                                                                                                               | Screen / code                                                                                                                 |
+| ---------- | --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| 4.1        | Truck + driver masters                                                                                                | Settings → Trucks / Drivers (`app/(desk)/settings/trucks`, `/drivers`)                                                        |
+| 4.1        | Trips with status Loading → In transit → Arrived → Closed                                                             | `/trips`, `/trips/new`, `/trips/[id]` (status stepper; In transit moves its challans to In transit)                           |
+| 4.1, 4.3.1 | "What is on this truck?"                                                                                              | `/trips/[id]`: parties, packages, freight, still to collect, challans grouped by the party who pays, trip expenses and profit |
+| 4.2        | Vendor (party) master + profile totals                                                                                | `/vendors`, `/vendors/[id]` (total business, received, pending, old balance)                                                  |
+| 4.3        | Challan: auto number, trip + parties, goods, freight, Paid / To-Pay / Billed later, status                            | `/challans/new` (4 steps), `/challans/[id]`, `/challans/[id]/edit` (goods/trip only)                                          |
+| 4.3        | A4 print + WhatsApp share, search by number / party / truck / date                                                    | `/challans/[id]/print`, `/challans?q=&day=`                                                                                   |
+| 4.4        | Payments (Cash / UPI / Bank), Pending / Part paid / Udhaar, ledger with running balance, overdue reminders + WhatsApp | `/payments/new`, `/vendors/[id]`, `/vendors/reminders`                                                                        |
+| 4.5        | Expenses with categories, mode, truck / trip link, bill photo; trip / truck / month reports                           | `/expenses`, `/expenses/new`, `/expenses/[id]`, `/reports/expenses`, `/reports/trip-profit`                                   |
+| 4.6        | Staff, monthly attendance, advances, deductions, net salary, mark paid, slip, register                                | `/salary`, `/salary/[id]`, `/salary/[id]/slip`, `/salary/register`, `/salary/staff/*`                                         |
+| 4.7        | GST settings, included / extra per challan, tax invoice, monthly summary to Excel                                     | Settings, `/challans/[id]/print?as=invoice`, `/gst`                                                                           |
+| 4.8        | Dashboard                                                                                                             | `/` (to collect, today's collection by mode, today's spend, trucks on the road, shortcuts, reminders)                         |
+| 4.9        | Cash book, outstanding, trip profit, expense report, salary register; PDF + Excel; daily backup                       | `/reports/*`, CSV via `/api/export/[report]`, PDF via print, nightly `/api/cron/backup` (keeps 30) + download in Settings     |
+| 2, 3       | Phone first, Hindi / English switch on every screen, nothing deleted by accident, edits logged                        | AppShell + LangSwitch, cancel instead of delete, `audit_log` + "Change history" on records                                    |
+
+### Design references (research 2026-11-20)
+
+- **Ledger and reminders:** Khatabook / Vyapar pattern. Running balance per party, "+ charged / − received" signed amounts on phones, a one-tap WhatsApp reminder with the text ready.
+- **Trip detail:** logistics-dashboard pattern (Dribbble / Contra fleet and shipment dashboards). A status stepper, then the load grouped by customer, with the money still out shown up front.
+- **Forms:** the step-by-step editor Utsav approved for the internal tools (one job per screen), big tap choices instead of dropdowns, native pickers on phones.
+- **Lists:** ruled rows, not card grids (Utsav's earlier feedback on the internal tools).
+- **Own:** the "route rail" (truck on a dashed road between two places) as the tool's signature; the dark "road" ground only for the day's summary and trip status. Fonts IBM Plex Sans + Plex Sans Devanagari + Plex Mono (truck plates, challan numbers).
+
+### Decisions taken (sensible defaults, change if the client wants)
+
+- **Who owes a challan:** sender for Paid and Billed later, receiver for To-Pay. Paid challans record their payment (with mode) at booking, so the cash book and ledger agree.
+- **Challan amounts can't be edited** after booking (goods, places and trip can). Cancel and rebook, so the ledger never changes silently.
+- **Salary formula:** monthly × (present + half days ÷ 2) ÷ days in month, rounded to whole rupees, minus advance and deductions. Present defaults to the full month. Salary frozen per month.
+- **Overdue reminder:** balance older than 15 days (Settings), oldest unpaid charge found first-in-first-out.
+- **Challan number format:** prefix (Settings, e.g. `KDR/`) + 4-digit serial. The next number is set in Settings and can only go forward.
+- **Excel = CSV** (UTF-8 BOM, opens in Excel with Hindi intact). **PDF = print → Save as PDF.** No extra libraries.
+- **Backups:** nightly gzip JSON in the database (last 30) + download any time. Restore is manual for now.
+
+### Open points with the client (from the doc, section 8, plus new ones)
+
+1. Their paper challan format and numbering, so `/challans/[id]/print` can match it (the current layout is a common bilty layout). One copy or three (consignor / consignee / office)?
+2. Challan per parcel or per consignment: the tool handles both (one challan = any number of packages).
+3. Salary: fixed monthly (built) or a per-trip driver allowance too?
+4. GST treatment from their CA (rate, reverse charge, exemptions). It's configurable today (default rate, included / extra / none per challan), nothing hard-coded. CGST/SGST/IGST split not shown yet.
+5. Opening balances from the paper khata: supported per party ("old balance") and opening cash (Settings). Old challans are not imported.
+6. **New:** the business name, address, phone and GSTIN for the letterhead (Settings).
+7. **New:** party advance or credit (negative old balance) isn't supported in the form yet.
+
+### Verified (2026-11-20)
+
+- `pnpm check` passes: typecheck, lint with 0 warnings, 27 unit tests (money, GST, salary, ledger, FIFO overdue, dates, CSV, WhatsApp numbers, amount in words, session, image sniffing), production build.
+- In Chrome (playwright-core + system Chrome) with demo data, at 390 px and 1440 px, every screen returns 200 with no console errors.
+- These flows work end to end:
+  - a challan through all 4 steps (empty step blocked, new receiver typed in place, trip fills To, Paid in cash, GST 5% extra = ₹2,625);
+  - a payment against a challan;
+  - an expense with a photo (shrunk to JPEG in the browser, shown on the expense page);
+  - a refused save keeping what was typed;
+  - salary marked paid;
+  - the Hindi switch (`<html lang="hi-IN">`);
+  - **a challan booked with JavaScript off.**
+- Our own first-load JS is about 10 KB gzipped (180 KB total on the login page, of which about 170 KB is the Next + React runtime).
+
+### Not verified yet
+
+- **Lighthouse** wasn't run: the auto-mode permission check blocked the run. Run it on `pnpm build && pnpm start -p 3100` after logging in.
+- **Postgres / Supabase:** only the embedded database has been used; `DATABASE_URL` and `pnpm db:migrate` are untested against a real server.
+- **On a phone:** not tested on a real phone (camera capture, WhatsApp hand-off, printing from a phone), and not with VoiceOver.
+- **Hindi wording** needs a native speaker's read.
+
+### Next
+
+1. Utsav reviews locally: `SEED_DEMO=1 pnpm dev` on an empty `.data/`, password in `.env.local`.
+2. Send the open points above to the client; match the print to their paper challan.
+3. Deploy (needs Utsav's OK):
+   1. create a Supabase project in Mumbai and run `DATABASE_URL=… pnpm db:migrate`;
+   2. create a Vercel project (region `bom1`) with `APP_PASSWORD`, `DATABASE_URL` and `CRON_SECRET`;
+   3. run Lighthouse on the live URL.
+4. Add a commit and a GitHub remote when Utsav asks.
+5. Phase 2 (doc section 5) only if needed.

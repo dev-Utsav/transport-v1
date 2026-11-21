@@ -1,0 +1,79 @@
+@layer base {
+  html {
+    background: var(--color-paper);
+    color: var(--color-ink);
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    background: var(--color-paper);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.5;
+    min-height: 100dvh;
+  }
+  /* Amounts and counts line up in columns. */
+  .num,
+  td,
+  input[inputmode="decimal"],
+  input[inputmode="numeric"] {
+    font-variant-numeric: tabular-nums;
+  }
+  :focus-visible {
+    outline: 3px solid var(--color-signal);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+  ::selection {
+    background: var(--color-signal-soft);
+  }
+  /* Fieldsets default to min-width: min-content, which lets a row of options push a card wider than a phone. */
+  fieldset {
+    min-width: 0;
+  }
+  /* Native pickers follow the theme. */
+  input,
+  select,
+  textarea {
+    accent-color: var(--color-signal);
+    color-scheme: light;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+    }
+  }
+}
+
+/*
+ * Unlayered on purpose: these hide elements that also carry Tailwind's `grid` utility, and
+ * unlayered rules win over every @layer (utilities included).
+ *
+ * Multi-step form: every step is in the HTML (so it works with JS off: all steps show).
+ * Once hydrated the island sets data-step and only the current step is visible.
+ */
+[data-steps][data-step] [data-step-panel] {
+  display: none;
+}
+[data-steps][data-step="0"] [data-step-panel="0"],
+[data-steps][data-step="1"] [data-step-panel="1"],
+[data-steps][data-step="2"] [data-step-panel="2"],
+[data-steps][data-step="3"] [data-step-panel="3"] {
+  display: grid;
+}
+
+/* "New party" fields under a party picker appear only when that option is chosen. */
+[data-new-party]:not(:has(option[value="new"]:checked)) [data-new-party-fields] {
+  display: none;
+}
+
+/* "Received by" only for Paid challans; the GST rate only when GST applies. CSS only. */
+form:not(:has(input[name="payType"][value="paid"]:checked)) [data-when-paid] {
+  display: none;
+}
+form:has(input[name="gstMode"][value="none"]:checked) [data-when-gst] {
+  display: none;
+}

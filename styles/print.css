@@ -1,0 +1,35 @@
+/* A4 print: the app chrome disappears and only the paper (challan, slip, report) prints. */
+@page {
+  size: A4;
+  margin: 12mm;
+}
+
+@media print {
+  html,
+  body {
+    background: var(--color-card);
+  }
+  [data-chrome],
+  [data-no-print] {
+    display: none !important;
+  }
+  [data-print-root] {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: none !important;
+  }
+  [data-paper] {
+    box-shadow: none !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+  }
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+  tr,
+  [data-keep] {
+    break-inside: avoid;
+  }
+}

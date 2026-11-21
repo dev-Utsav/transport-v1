@@ -1,0 +1,47 @@
+@import "tailwindcss";
+@import "../styles/base.css";
+@import "../styles/print.css";
+
+/*
+ * Tokens. Tailwind's default palette is removed: only these colours exist.
+ * Every text/ground pair below is checked for WCAG AA (see docs/PROGRESS.md, 2026-11-20).
+ * No raw hex anywhere else; add a token here instead.
+ */
+@theme static {
+  --color-*: initial;
+  --color-paper: #f4f1ea; /* page ground: register paper */
+  --color-paper-deep: #ebe6da;
+  --color-card: #ffffff;
+  --color-ink: #15191c;
+  --color-ink-2: #5a6066; /* secondary text, AA on paper and card */
+  --color-ink-3: #6b7177; /* hints on white only */
+  --color-rule: #e2ddd1;
+  --color-rule-strong: #cbc4b4;
+  --color-signal: #b8401a; /* the one action colour: buttons, active tab, focus */
+  --color-signal-hover: #9f3614;
+  --color-signal-soft: #fbe6da;
+  --color-signal-ink: #a1370f;
+  --color-road: #1b242a; /* dark "dashboard" ground for the today card and trip rail */
+  --color-road-2: #26323a;
+  --color-road-text: #f4f1ea;
+  --color-road-muted: #9aa6ae;
+  --color-road-signal: #f08a5d;
+  --color-in: #13603a; /* money received */
+  --color-in-soft: #e3f1e7;
+  --color-due: #a3261c; /* money still owed */
+  --color-due-soft: #fbe4e1;
+  --color-part: #7a5200; /* part paid / waiting */
+  --color-part-soft: #fcf0d4;
+
+  --font-sans: var(--font-plex), var(--font-plex-deva), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+
+  --radius-card: 18px;
+  --radius-field: 12px;
+  --radius-pill: 999px;
+
+  --shadow-card: 0 1px 0 rgb(21 25 28 / 0.04), 0 1px 3px rgb(21 25 28 / 0.06);
+  --shadow-lift: 0 8px 28px rgb(21 25 28 / 0.12);
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
