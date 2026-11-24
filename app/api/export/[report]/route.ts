@@ -83,6 +83,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ repo
       break;
     }
     case "salary": {
+      // Salaries are private: exporting reports isn't enough (office has reports.export).
+      const deniedSalary = await apiDenied("salary.view");
+      if (deniedSalary) return deniedSalary;
       const rows = (await salaryRegister(month)).filter((r) => r.entry && r.pay);
       sheet = {
         name: `salary-${month}`,

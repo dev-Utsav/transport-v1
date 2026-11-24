@@ -23,11 +23,11 @@ export function ExpenseForm({
   trips: { id: number; label: string }[];
   initial: Record<string, string>;
 }) {
-  const { formAction, v, e, hasErrors } = useForm(addExpense, initial);
+  const { state, formAction, v, e } = useForm(addExpense, initial);
   const c = t.common;
   return (
     <form action={formAction} className="grid max-w-xl gap-5">
-      <FormError show={hasErrors} message={c.fixErrors} />
+      <FormError state={state} c={c} />
       <Field id="amount" label={c.amount} error={e("amount")} c={c}>
         <MoneyInput
           id="amount"

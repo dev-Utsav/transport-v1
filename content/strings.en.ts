@@ -63,6 +63,14 @@ export const en = {
     notFound: "This page doesn't exist.",
     goHome: "Go to Home",
     fixErrors: "Please check the marked fields.",
+    saveFailed: {
+      denied: "Your login can't do this. Ask the admin if you need it.",
+      busy: "Couldn't save just now (connection). What you typed is kept; press Save again.",
+      taken: "Someone else saved this just now. Check the list, then try again.",
+      server:
+        "Couldn't save. Nothing was changed. Try again; if it keeps happening, send the reference below to support.",
+    },
+    errorRef: "Reference:",
     saved: "Saved",
     language: "Language",
     required: "Required",

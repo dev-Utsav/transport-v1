@@ -90,7 +90,10 @@ export default async function ChallanPage({
         back={{ href: "/challans", label: t.challans.title }}
         title={
           <>
-            {t.challans.no} <span className="font-mono tracking-wide">{no}</span>
+            {t.challans.no}{" "}
+            <span className="font-mono tracking-wide" data-challan-no={c.no}>
+              {no}
+            </span>
           </>
         }
         sub={

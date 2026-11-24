@@ -13,7 +13,7 @@ import { logChange } from "@/server/audit";
 import { getDb } from "@/server/db";
 import { salaryMonths, staff } from "@/server/db/schema";
 import { assertCan } from "@/server/auth";
-import { refreshDesk } from "@/server/guard";
+import { guardForm, refreshDesk } from "@/server/guard";
 
 const entrySchema = z
   .object({
@@ -41,37 +41,46 @@ const entrySchema = z
 
 /** Saves attendance, advances and deductions; optionally marks the net as paid in the same step. */
 export async function saveSalaryEntry(_prev: FormState, formData: FormData): Promise<FormState> {
-  await assertCan("salary.manage");
-  const values = formValues(formData);
-  const parsed = entrySchema.safeParse(values);
-  if (!parsed.success) return failed(parsed.error, values);
-  const { markPaid, paidMode, paidOn, ...entry } = parsed.data;
-  const db = await getDb();
-  await db.transaction(async (tx) => {
-    const [employee] = await tx.select().from(staff).where(eq(staff.id, entry.staffId));
-    if (!employee) throw new Error("Employee not found");
-    const [before] = await tx
-      .select()
-      .from(salaryMonths)
-      .where(and(eq(salaryMonths.staffId, entry.staffId), eq(salaryMonths.month, entry.month)));
-    // Salary is frozen per month: an existing entry keeps the rate it was made with.
-    const monthlySalary = before?.monthlySalary ?? employee.monthlySalary;
-    const net = calcSalary({ ...entry, monthlySalary }).net;
-    const paid =
-      markPaid === "yes" && paidMode && paidOn
-        ? { paidMode, paidOn, paidAmount: net }
-        : {
-            paidMode: before?.paidMode ?? null,
-            paidOn: before?.paidOn ?? null,
-            paidAmount: before?.paidAmount ?? null,
-          };
-    const row = { ...entry, monthlySalary, ...paid };
-    const [after] = before
-      ? await tx.update(salaryMonths).set(row).where(eq(salaryMonths.id, before.id)).returning()
-      : await tx.insert(salaryMonths).values(row).returning();
-    if (after)
-      await logChange(tx, "salary", after.id, before ? "update" : "create", before ?? null, after);
+  return guardForm(formData, async () => {
+    await assertCan("salary.manage");
+    const values = formValues(formData);
+    const parsed = entrySchema.safeParse(values);
+    if (!parsed.success) return failed(parsed.error, values);
+    const { markPaid, paidMode, paidOn, ...entry } = parsed.data;
+    const db = await getDb();
+    await db.transaction(async (tx) => {
+      const [employee] = await tx.select().from(staff).where(eq(staff.id, entry.staffId));
+      if (!employee) throw new Error("Employee not found");
+      const [before] = await tx
+        .select()
+        .from(salaryMonths)
+        .where(and(eq(salaryMonths.staffId, entry.staffId), eq(salaryMonths.month, entry.month)));
+      // Salary is frozen per month: an existing entry keeps the rate it was made with.
+      const monthlySalary = before?.monthlySalary ?? employee.monthlySalary;
+      const net = calcSalary({ ...entry, monthlySalary }).net;
+      const paid =
+        markPaid === "yes" && paidMode && paidOn
+          ? { paidMode, paidOn, paidAmount: net }
+          : {
+              paidMode: before?.paidMode ?? null,
+              paidOn: before?.paidOn ?? null,
+              paidAmount: before?.paidAmount ?? null,
+            };
+      const row = { ...entry, monthlySalary, ...paid };
+      const [after] = before
+        ? await tx.update(salaryMonths).set(row).where(eq(salaryMonths.id, before.id)).returning()
+        : await tx.insert(salaryMonths).values(row).returning();
+      if (after)
+        await logChange(
+          tx,
+          "salary",
+          after.id,
+          before ? "update" : "create",
+          before ?? null,
+          after,
+        );
+    });
+    refreshDesk();
+    redirect(`/salary?month=${entry.month}&saved=1`);
   });
-  refreshDesk();
-  redirect(`/salary?month=${entry.month}&saved=1`);
 }

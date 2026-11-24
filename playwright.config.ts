@@ -7,7 +7,13 @@ import { defineConfig } from "@playwright/test";
  * Uses the installed Google Chrome (no browser download). Phone 390 px + desktop 1440 px.
  */
 const PORT = 3300;
-export const E2E_PASSWORD = "e2e-password";
+export const E2E_PASSWORD = process.env.E2E_PASSWORD ?? "e2e-password";
+
+/**
+ * Staging: E2E_BASE_URL=https://… E2E_PASSWORD=… runs against a deployed copy instead of a local
+ * build (no web server started). Point it only at staging, never at production: specs write data.
+ */
+const remote = process.env.E2E_BASE_URL;
 
 export default defineConfig({
   testDir: "tests/end-to-end",
@@ -17,7 +23,11 @@ export default defineConfig({
   retries: 0,
   reporter: [["list"], ["html", { outputFolder: ".data/e2e-report", open: "never" }]],
   use: {
-    baseURL: `http://localhost:${PORT}`,
+    baseURL: remote ?? `http://localhost:${PORT}`,
+    // Vercel preview protection: Settings → Deployment Protection → Protection Bypass for Automation
+    ...(process.env.VERCEL_BYPASS
+      ? { extraHTTPHeaders: { "x-vercel-protection-bypass": process.env.VERCEL_BYPASS } }
+      : {}),
     channel: "chrome",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
@@ -42,18 +52,20 @@ export default defineConfig({
       },
     },
   ],
-  webServer: {
-    command: `rm -rf .data/e2e && pnpm build && pnpm start -p ${PORT}`,
-    url: `http://localhost:${PORT}/login`,
-    reuseExistingServer: false,
-    timeout: 240_000,
-    env: {
-      TD_DATA_DIR: ".data/e2e",
-      SEED_DEMO: "1",
-      APP_PASSWORD: E2E_PASSWORD,
-      CRON_SECRET: "e2e-cron-secret-0000",
-      SESSION_SECRET: "e2e-session-secret-0000000000000000000000",
-      DATABASE_URL: "",
-    },
-  },
+  webServer: remote
+    ? undefined
+    : {
+        command: `rm -rf .data/e2e && pnpm build && pnpm start -p ${PORT}`,
+        url: `http://localhost:${PORT}/login`,
+        reuseExistingServer: false,
+        timeout: 240_000,
+        env: {
+          TD_DATA_DIR: ".data/e2e",
+          SEED_DEMO: "1",
+          APP_PASSWORD: E2E_PASSWORD,
+          CRON_SECRET: "e2e-cron-secret-0000",
+          SESSION_SECRET: "e2e-session-secret-0000000000000000000000",
+          DATABASE_URL: "",
+        },
+      },
 });

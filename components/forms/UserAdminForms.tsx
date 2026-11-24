@@ -1,5 +1,6 @@
 "use client";
 
+import { FormError } from "@/components/forms/FormError";
 import { useForm } from "@/components/forms/useForm";
 import { Field, TextInput } from "@/components/ui/Field";
 import { SubmitButton } from "@/components/ui/SubmitButton";
@@ -10,10 +11,11 @@ const BOX = "grid gap-4 rounded-card bg-card p-5 shadow-card ring-1 ring-rule";
 
 /** Admin: give someone a new first password (they change it on next sign-in). */
 export function ResetPasswordForm({ t, id }: { t: Pick<Strings, "common" | "users">; id: number }) {
-  const { formAction, e } = useForm(resetUserPassword);
+  const { state, formAction, e } = useForm(resetUserPassword);
   return (
     <form action={formAction} className={BOX}>
       <input type="hidden" name="id" value={id} />
+      <FormError state={state} c={t.common} />
       <Field
         id="reset-password"
         label={t.users.tempPassword}
@@ -50,11 +52,13 @@ export function ToggleUserForm({
   id: number;
   isActive: boolean;
 }) {
-  const { formAction, e } = useForm(toggleUser);
+  const { state, formAction, e } = useForm(toggleUser);
   const message = e("self") ? t.users.errSelf : e("lastAdmin") ? t.users.errLastAdmin : null;
   return (
     <form action={formAction} className="grid gap-2 border-t border-rule pt-6">
       <input type="hidden" name="id" value={id} />
+      {/* its own refusals show below; only a failed save uses the banner */}
+      <FormError state={{ ...state, errors: {} }} c={t.common} />
       <button className="min-h-12 justify-self-start rounded-field px-4 text-[15px] font-semibold text-ink-2 ring-1 ring-rule-strong hover:bg-card">
         {isActive ? t.common.deactivate : t.common.activate}
       </button>

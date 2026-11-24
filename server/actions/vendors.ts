@@ -11,7 +11,7 @@ import { logChange } from "@/server/audit";
 import { getDb } from "@/server/db";
 import { vendors } from "@/server/db/schema";
 import { assertCan } from "@/server/auth";
-import { refreshDesk } from "@/server/guard";
+import { guardForm, refreshDesk } from "@/server/guard";
 
 const gstin = z
   .string()
@@ -36,27 +36,29 @@ const vendorSchema = z.object({
 });
 
 export async function saveVendor(_prev: FormState, formData: FormData): Promise<FormState> {
-  await assertCan("parties.manage");
-  const values = formValues(formData);
-  const parsed = vendorSchema.safeParse(values);
-  if (!parsed.success) return failed(parsed.error, values);
-  const { id, back, ...data } = parsed.data;
-  const db = await getDb();
-  const savedId = await db.transaction(async (tx) => {
-    if (id) {
-      const [before] = await tx.select().from(vendors).where(eq(vendors.id, id));
-      if (!before) throw new Error("Vendor not found");
-      const [after] = await tx.update(vendors).set(data).where(eq(vendors.id, id)).returning();
-      await logChange(tx, "vendor", id, "update", before, after);
-      return id;
-    }
-    const [created] = await tx.insert(vendors).values(data).returning();
-    if (!created) throw new Error("Insert failed");
-    await logChange(tx, "vendor", created.id, "create", null, created);
-    return created.id;
+  return guardForm(formData, async () => {
+    await assertCan("parties.manage");
+    const values = formValues(formData);
+    const parsed = vendorSchema.safeParse(values);
+    if (!parsed.success) return failed(parsed.error, values);
+    const { id, back, ...data } = parsed.data;
+    const db = await getDb();
+    const savedId = await db.transaction(async (tx) => {
+      if (id) {
+        const [before] = await tx.select().from(vendors).where(eq(vendors.id, id));
+        if (!before) throw new Error("Vendor not found");
+        const [after] = await tx.update(vendors).set(data).where(eq(vendors.id, id)).returning();
+        await logChange(tx, "vendor", id, "update", before, after);
+        return id;
+      }
+      const [created] = await tx.insert(vendors).values(data).returning();
+      if (!created) throw new Error("Insert failed");
+      await logChange(tx, "vendor", created.id, "create", null, created);
+      return created.id;
+    });
+    refreshDesk();
+    redirect(back ?? `/vendors/${savedId}`);
   });
-  refreshDesk();
-  redirect(back ?? `/vendors/${savedId}`);
 }
 
 export async function toggleVendor(formData: FormData): Promise<void> {

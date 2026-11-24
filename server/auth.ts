@@ -84,11 +84,19 @@ export async function requireAccess(...anyOf: Permission[]): Promise<Actor> {
   return actor;
 }
 
+/** Thrown by assertCan, so guardForm can tell a refusal from a real failure. */
+export class AccessError extends Error {
+  constructor(readonly reason: "signedOut" | "denied") {
+    super(reason === "signedOut" ? "Not signed in" : "Not allowed");
+    this.name = "AccessError";
+  }
+}
+
 /** Server actions and API routes: throws instead of redirecting. */
 export async function assertCan(...anyOf: Permission[]): Promise<Actor> {
   const actor = await getActor();
-  if (!actor) throw new Error("Not signed in");
-  if (anyOf.length > 0 && !can(actor, ...anyOf)) throw new Error("Not allowed");
+  if (!actor) throw new AccessError("signedOut");
+  if (anyOf.length > 0 && !can(actor, ...anyOf)) throw new AccessError("denied");
   return actor;
 }
 

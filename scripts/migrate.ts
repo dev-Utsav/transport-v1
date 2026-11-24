@@ -10,7 +10,18 @@ if (!url) {
   );
   process.exit(1);
 }
-const client = postgres(url, { max: 1, prepare: false });
-await migrate(drizzle({ client }), { migrationsFolder: "drizzle" });
-await client.end();
-console.warn("Migrations applied.");
+// No top-level await: package.json has no "type": "module", so tsx runs this as CommonJS.
+async function main(dbUrl: string): Promise<void> {
+  const client = postgres(dbUrl, { max: 1, prepare: false });
+  try {
+    await migrate(drizzle({ client }), { migrationsFolder: "drizzle" });
+    console.warn("Migrations applied.");
+  } finally {
+    await client.end();
+  }
+}
+
+main(url).catch((err: unknown) => {
+  console.error(err);
+  process.exit(1);
+});

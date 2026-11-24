@@ -16,11 +16,11 @@ export function VendorForm({
   t: Pick<Strings, "common" | "vendors" | "vendorKinds">;
   initial: Record<string, string>;
 }) {
-  const { formAction, v, e, hasErrors } = useForm(saveVendor, initial);
+  const { state, formAction, v, e } = useForm(saveVendor, initial);
   const c = t.common;
   return (
     <form action={formAction} className="grid max-w-xl gap-5">
-      <FormError show={hasErrors} message={c.fixErrors} />
+      <FormError state={state} c={c} />
       {initial.id ? <input type="hidden" name="id" value={initial.id} /> : null}
       {initial.back ? <input type="hidden" name="back" value={initial.back} /> : null}
       <Field id="name" label={c.name} error={e("name")} c={c}>

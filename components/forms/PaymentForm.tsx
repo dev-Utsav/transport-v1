@@ -32,7 +32,7 @@ export function PaymentForm({
   balance: number | null;
   initial: Record<string, string>;
 }) {
-  const { formAction, v, e, hasErrors } = useForm(recordPayment, initial);
+  const { state, formAction, v, e } = useForm(recordPayment, initial);
   const c = t.common;
   const router = useRouter();
   const [amount, setAmount] = useState(v("amount"));
@@ -50,7 +50,7 @@ export function PaymentForm({
 
   return (
     <form action={formAction} className="grid max-w-xl gap-5">
-      <FormError show={hasErrors} message={c.fixErrors} />
+      <FormError state={state} c={c} />
       {initial.back ? <input type="hidden" name="back" value={initial.back} /> : null}
       <Field id="vendorId" label={t.payments.party} error={e("vendorId")} c={c}>
         <SelectInput

@@ -18,11 +18,11 @@ export function TruckForm({
   t: Pick<Strings, "common" | "settings" | "owners">;
   initial: Record<string, string>;
 }) {
-  const { formAction, v, e, hasErrors } = useForm(saveTruck, initial);
+  const { state, formAction, v, e } = useForm(saveTruck, initial);
   const c = t.common;
   return (
     <form action={formAction} className={BOX}>
-      <FormError show={hasErrors} message={c.fixErrors} />
+      <FormError state={state} c={c} />
       {initial.id ? <input type="hidden" name="id" value={initial.id} /> : null}
       <div className="grid gap-4 sm:grid-cols-2">
         <Field id="number" label={t.settings.truckNo} error={e("number")} c={c}>
@@ -61,11 +61,11 @@ export function DriverForm({
   t: Pick<Strings, "common" | "settings">;
   initial: Record<string, string>;
 }) {
-  const { formAction, v, e, hasErrors } = useForm(saveDriver, initial);
+  const { state, formAction, v, e } = useForm(saveDriver, initial);
   const c = t.common;
   return (
     <form action={formAction} className={BOX}>
-      <FormError show={hasErrors} message={c.fixErrors} />
+      <FormError state={state} c={c} />
       {initial.id ? <input type="hidden" name="id" value={initial.id} /> : null}
       <div className="grid gap-4 sm:grid-cols-3">
         <Field id="name" label={c.name} error={e("name")} c={c}>

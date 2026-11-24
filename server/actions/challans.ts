@@ -13,7 +13,7 @@ import type { Tx } from "@/server/db";
 import { getDb } from "@/server/db";
 import { challans, payments, settings, trips, vendors } from "@/server/db/schema";
 import { assertCan } from "@/server/auth";
-import { refreshDesk } from "@/server/guard";
+import { guardForm, refreshDesk } from "@/server/guard";
 
 /** A party picker: an existing id, or "new" with a name (and phone) typed in place. */
 const partyPick = z.union([z.literal("new"), z.coerce.number().int().positive()]);
@@ -91,85 +91,87 @@ async function resolveParty(
 }
 
 export async function createChallan(_prev: FormState, formData: FormData): Promise<FormState> {
-  await assertCan("challans.book");
-  const values = formValues(formData);
-  const parsed = challanSchema.safeParse(values);
-  if (!parsed.success) {
-    const first = parsed.error.issues[0]?.path.join(".") ?? "";
-    return failed(parsed.error, values, STEP_OF[first] ?? 0);
-  }
-  const c = parsed.data;
-  const rateBp = c.gstMode === "none" ? 0 : (parseRate(c.gstRate) ?? 0);
-  const gst = splitGst(c.freight, c.gstMode, rateBp);
-  const db = await getDb();
-
-  const id = await db.transaction(async (tx) => {
-    const senderId = await resolveParty(
-      tx,
-      c.senderId,
-      c.senderNewName,
-      c.senderNewPhone,
-      "sender",
-    );
-    const receiverId = await resolveParty(
-      tx,
-      c.receiverId,
-      c.receiverNewName,
-      c.receiverNewPhone,
-      "receiver",
-    );
-    // The settings row lock makes numbering safe even with two saves at the same moment.
-    const [counter] = await tx
-      .update(settings)
-      .set({ nextChallanNo: sql`${settings.nextChallanNo} + 1` })
-      .where(eq(settings.id, 1))
-      .returning({ next: settings.nextChallanNo });
-    if (!counter) throw new Error("Settings row missing");
-    if (c.tripId) {
-      const [trip] = await tx.select({ id: trips.id }).from(trips).where(eq(trips.id, c.tripId));
-      if (!trip) throw new Error("Trip not found");
+  return guardForm(formData, async () => {
+    await assertCan("challans.book");
+    const values = formValues(formData);
+    const parsed = challanSchema.safeParse(values);
+    if (!parsed.success) {
+      const first = parsed.error.issues[0]?.path.join(".") ?? "";
+      return failed(parsed.error, values, STEP_OF[first] ?? 0);
     }
-    const [created] = await tx
-      .insert(challans)
-      .values({
-        no: counter.next - 1,
-        bookedOn: c.bookedOn,
-        tripId: c.tripId,
-        senderId,
-        receiverId,
-        partyId: c.payType === "to_pay" ? receiverId : senderId,
-        fromPlace: c.fromPlace,
-        toPlace: c.toPlace,
-        packages: c.packages,
-        description: c.description,
-        weightKg: c.weightKg,
-        freight: c.freight,
-        gstMode: c.gstMode,
-        gstRateBp: rateBp,
-        ...gst,
-        payType: c.payType,
-        status: c.tripId ? "loaded" : "booked",
-      })
-      .returning();
-    if (!created) throw new Error("Insert failed");
-    await logChange(tx, "challan", created.id, "create", null, created);
-    if (c.payType === "paid" && c.payNowMode) {
-      const [payment] = await tx
-        .insert(payments)
+    const c = parsed.data;
+    const rateBp = c.gstMode === "none" ? 0 : (parseRate(c.gstRate) ?? 0);
+    const gst = splitGst(c.freight, c.gstMode, rateBp);
+    const db = await getDb();
+
+    const id = await db.transaction(async (tx) => {
+      const senderId = await resolveParty(
+        tx,
+        c.senderId,
+        c.senderNewName,
+        c.senderNewPhone,
+        "sender",
+      );
+      const receiverId = await resolveParty(
+        tx,
+        c.receiverId,
+        c.receiverNewName,
+        c.receiverNewPhone,
+        "receiver",
+      );
+      // The settings row lock makes numbering safe even with two saves at the same moment.
+      const [counter] = await tx
+        .update(settings)
+        .set({ nextChallanNo: sql`${settings.nextChallanNo} + 1` })
+        .where(eq(settings.id, 1))
+        .returning({ next: settings.nextChallanNo });
+      if (!counter) throw new Error("Settings row missing");
+      if (c.tripId) {
+        const [trip] = await tx.select({ id: trips.id }).from(trips).where(eq(trips.id, c.tripId));
+        if (!trip) throw new Error("Trip not found");
+      }
+      const [created] = await tx
+        .insert(challans)
         .values({
-          vendorId: senderId,
-          challanId: created.id,
-          amount: gst.total,
-          mode: c.payNowMode,
-          paidOn: c.bookedOn,
+          no: counter.next - 1,
+          bookedOn: c.bookedOn,
+          tripId: c.tripId,
+          senderId,
+          receiverId,
+          partyId: c.payType === "to_pay" ? receiverId : senderId,
+          fromPlace: c.fromPlace,
+          toPlace: c.toPlace,
+          packages: c.packages,
+          description: c.description,
+          weightKg: c.weightKg,
+          freight: c.freight,
+          gstMode: c.gstMode,
+          gstRateBp: rateBp,
+          ...gst,
+          payType: c.payType,
+          status: c.tripId ? "loaded" : "booked",
         })
         .returning();
-      if (payment) await logChange(tx, "payment", payment.id, "create", null, payment);
-    }
-    return created.id;
+      if (!created) throw new Error("Insert failed");
+      await logChange(tx, "challan", created.id, "create", null, created);
+      if (c.payType === "paid" && c.payNowMode) {
+        const [payment] = await tx
+          .insert(payments)
+          .values({
+            vendorId: senderId,
+            challanId: created.id,
+            amount: gst.total,
+            mode: c.payNowMode,
+            paidOn: c.bookedOn,
+          })
+          .returning();
+        if (payment) await logChange(tx, "payment", payment.id, "create", null, payment);
+      }
+      return created.id;
+    });
+    refreshDesk();
+    redirect(`/challans/${id}?saved=1`);
   });
-  refreshDesk();
-  redirect(`/challans/${id}?saved=1`);
 }
 
 const editSchema = z.object({
@@ -184,20 +186,22 @@ const editSchema = z.object({
 
 /** Goods and trip can be corrected; money can't (cancel and book again, so the ledger stays true). */
 export async function editChallan(_prev: FormState, formData: FormData): Promise<FormState> {
-  await assertCan("challans.edit");
-  const values = formValues(formData);
-  const parsed = editSchema.safeParse(values);
-  if (!parsed.success) return failed(parsed.error, values);
-  const { id, ...data } = parsed.data;
-  const db = await getDb();
-  await db.transaction(async (tx) => {
-    const [before] = await tx.select().from(challans).where(eq(challans.id, id));
-    if (!before || before.isCancelled) throw new Error("Challan not editable");
-    const [after] = await tx.update(challans).set(data).where(eq(challans.id, id)).returning();
-    await logChange(tx, "challan", id, "update", before, after);
+  return guardForm(formData, async () => {
+    await assertCan("challans.edit");
+    const values = formValues(formData);
+    const parsed = editSchema.safeParse(values);
+    if (!parsed.success) return failed(parsed.error, values);
+    const { id, ...data } = parsed.data;
+    const db = await getDb();
+    await db.transaction(async (tx) => {
+      const [before] = await tx.select().from(challans).where(eq(challans.id, id));
+      if (!before || before.isCancelled) throw new Error("Challan not editable");
+      const [after] = await tx.update(challans).set(data).where(eq(challans.id, id)).returning();
+      await logChange(tx, "challan", id, "update", before, after);
+    });
+    refreshDesk();
+    redirect(`/challans/${id}`);
   });
-  refreshDesk();
-  redirect(`/challans/${id}`);
 }
 
 export async function setChallanStatus(formData: FormData): Promise<void> {

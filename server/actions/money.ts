@@ -12,7 +12,7 @@ import { logChange } from "@/server/audit";
 import { getDb } from "@/server/db";
 import { billPhotos, challans, expenses, payments } from "@/server/db/schema";
 import { assertCan } from "@/server/auth";
-import { refreshDesk } from "@/server/guard";
+import { guardForm, refreshDesk } from "@/server/guard";
 
 const MAX_PHOTO_BYTES = 1_500_000;
 
@@ -31,30 +31,32 @@ const paymentSchema = z.object({
 });
 
 export async function recordPayment(_prev: FormState, formData: FormData): Promise<FormState> {
-  await assertCan("payments.record");
-  const values = formValues(formData);
-  const parsed = paymentSchema.safeParse(values);
-  if (!parsed.success) return failed(parsed.error, values);
-  const { back, ...data } = parsed.data;
-  const db = await getDb();
-  if (data.challanId) {
-    // A payment against a challan must come from the party who owes it.
-    const [owner] = await db
-      .select({ partyId: challans.partyId })
-      .from(challans)
-      .where(and(eq(challans.id, data.challanId), eq(challans.isCancelled, false)));
-    if (owner?.partyId !== data.vendorId)
-      return { ok: false, errors: { challanId: "invalid" }, values };
-  }
-  const paymentId = await db.transaction(async (tx) => {
-    const [created] = await tx.insert(payments).values(data).returning();
-    if (!created) throw new Error("Insert failed");
-    await logChange(tx, "payment", created.id, "create", null, created);
-    return created.id;
+  return guardForm(formData, async () => {
+    await assertCan("payments.record");
+    const values = formValues(formData);
+    const parsed = paymentSchema.safeParse(values);
+    if (!parsed.success) return failed(parsed.error, values);
+    const { back, ...data } = parsed.data;
+    const db = await getDb();
+    if (data.challanId) {
+      // A payment against a challan must come from the party who owes it.
+      const [owner] = await db
+        .select({ partyId: challans.partyId })
+        .from(challans)
+        .where(and(eq(challans.id, data.challanId), eq(challans.isCancelled, false)));
+      if (owner?.partyId !== data.vendorId)
+        return { ok: false, errors: { challanId: "invalid" }, values };
+    }
+    const paymentId = await db.transaction(async (tx) => {
+      const [created] = await tx.insert(payments).values(data).returning();
+      if (!created) throw new Error("Insert failed");
+      await logChange(tx, "payment", created.id, "create", null, created);
+      return created.id;
+    });
+    refreshDesk();
+    // Back on the party's page, which offers the WhatsApp receipt for this payment.
+    redirect(back ?? `/vendors/${data.vendorId}?saved=1&payment=${paymentId}`);
   });
-  refreshDesk();
-  // Back on the party's page, which offers the WhatsApp receipt for this payment.
-  redirect(back ?? `/vendors/${data.vendorId}?saved=1&payment=${paymentId}`);
 }
 
 export async function cancelPayment(formData: FormData): Promise<void> {
@@ -81,32 +83,34 @@ const expenseSchema = z.object({
 });
 
 export async function addExpense(_prev: FormState, formData: FormData): Promise<FormState> {
-  await assertCan("expenses.record");
-  const values = formValues(formData);
-  const parsed = expenseSchema.safeParse(values);
-  if (!parsed.success) return failed(parsed.error, values);
+  return guardForm(formData, async () => {
+    await assertCan("expenses.record");
+    const values = formValues(formData);
+    const parsed = expenseSchema.safeParse(values);
+    if (!parsed.success) return failed(parsed.error, values);
 
-  const file = formData.get("photo");
-  let photo: { mime: string; data: Buffer } | null = null;
-  if (file instanceof File && file.size > 0) {
-    if (file.size > MAX_PHOTO_BYTES) return { ok: false, errors: { photo: "invalid" }, values };
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    const mime = sniffImage(bytes);
-    if (!mime) return { ok: false, errors: { photo: "invalid" }, values };
-    photo = { mime, data: Buffer.from(bytes) };
-  }
-  const db = await getDb();
-  await db.transaction(async (tx) => {
-    const [created] = await tx
-      .insert(expenses)
-      .values({ ...parsed.data, hasPhoto: photo !== null })
-      .returning();
-    if (!created) throw new Error("Insert failed");
-    if (photo) await tx.insert(billPhotos).values({ expenseId: created.id, ...photo });
-    await logChange(tx, "expense", created.id, "create", null, created);
+    const file = formData.get("photo");
+    let photo: { mime: string; data: Buffer } | null = null;
+    if (file instanceof File && file.size > 0) {
+      if (file.size > MAX_PHOTO_BYTES) return { ok: false, errors: { photo: "invalid" }, values };
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const mime = sniffImage(bytes);
+      if (!mime) return { ok: false, errors: { photo: "invalid" }, values };
+      photo = { mime, data: Buffer.from(bytes) };
+    }
+    const db = await getDb();
+    await db.transaction(async (tx) => {
+      const [created] = await tx
+        .insert(expenses)
+        .values({ ...parsed.data, hasPhoto: photo !== null })
+        .returning();
+      if (!created) throw new Error("Insert failed");
+      if (photo) await tx.insert(billPhotos).values({ expenseId: created.id, ...photo });
+      await logChange(tx, "expense", created.id, "create", null, created);
+    });
+    refreshDesk();
+    redirect(`/expenses?month=${parsed.data.spentOn.slice(0, 7)}&saved=1`);
   });
-  refreshDesk();
-  redirect(`/expenses?month=${parsed.data.spentOn.slice(0, 7)}&saved=1`);
 }
 
 export async function cancelExpense(formData: FormData): Promise<void> {

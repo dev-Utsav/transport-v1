@@ -80,6 +80,8 @@ export async function login(_prev: LoginState, formData: FormData): Promise<Logi
     return { error: "tooMany" };
   }
   const password = String(formData.get("password") ?? "");
+  // No real password is this long (the limit is 200); don't spend scrypt time on a 2 MB one.
+  if (password.length > 200 || login.length > 40) return { error: "wrong" };
   const db = await getRealDb();
   const [user] = await db
     .select()

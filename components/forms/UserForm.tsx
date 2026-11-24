@@ -22,7 +22,7 @@ export function UserForm({
   roles: Role[];
   staff: { id: number; name: string; role: keyof Strings["roles"] }[];
 }) {
-  const { formAction, v, e, hasErrors } = useForm(saveUser, initial);
+  const { state, formAction, v, e } = useForm(saveUser, initial);
   const c = t.common;
   const held = new Set(v("roleIds").split(",").filter(Boolean));
   const roleError = e("roleIds") ?? e("roleIds-lastAdmin");
@@ -32,7 +32,7 @@ export function UserForm({
   const help = (r: Role) => (isSystemRole(r.key) ? t.roleHelp[r.key] : "");
   return (
     <form action={formAction} className="grid max-w-xl gap-5">
-      <FormError show={hasErrors} message={c.fixErrors} />
+      <FormError state={state} c={c} />
       {initial.id ? <input type="hidden" name="id" value={initial.id} /> : null}
       <Field id="name" label={c.name} error={e("name")} c={c}>
         <TextInput id="name" name="name" defaultValue={v("name")} invalid={Boolean(e("name"))} />

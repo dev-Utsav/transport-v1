@@ -56,18 +56,24 @@ async function connectReal(): Promise<Database> {
   if (url) {
     const db = await postgresDb(url, "public");
     await ensureSettings(db);
+    // Staging only: sample data + demo logins for testing. Never on Vercel's production env.
+    if (process.env.SEED_DEMO === "1" && process.env.VERCEL_ENV !== "production")
+      await seedDemo(db);
     return db;
   }
   // The live tool must never fall back to a throwaway disk database.
   if (process.env.VERCEL) throw new Error("DATABASE_URL is missing.");
   const db = await pgliteDb("pglite");
   await ensureSettings(db);
-  if (process.env.SEED_DEMO === "1") {
-    const { seedDemoLogins, seedSampleIfEmpty } = await import("@/server/db/sample");
-    await seedSampleIfEmpty(db);
-    await seedDemoLogins(db, process.env.APP_PASSWORD ?? "demo-password");
-  }
+  if (process.env.SEED_DEMO === "1") await seedDemo(db);
   return db;
+}
+
+/** Sample data + demo logins (admin, neha, ramesh, kishan) with APP_PASSWORD. */
+async function seedDemo(db: Database): Promise<void> {
+  const { seedDemoLogins, seedSampleIfEmpty } = await import("@/server/db/sample");
+  await seedSampleIfEmpty(db);
+  await seedDemoLogins(db, process.env.APP_PASSWORD ?? "demo-password");
 }
 
 async function connectPractice(): Promise<Database> {

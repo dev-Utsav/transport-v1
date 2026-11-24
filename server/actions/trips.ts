@@ -12,7 +12,7 @@ import { logChange } from "@/server/audit";
 import { getDb } from "@/server/db";
 import { challans, trips } from "@/server/db/schema";
 import { assertCan } from "@/server/auth";
-import { refreshDesk } from "@/server/guard";
+import { guardForm, refreshDesk } from "@/server/guard";
 
 const tripSchema = z
   .object({
@@ -33,50 +33,52 @@ const tripSchema = z
   });
 
 export async function saveTrip(_prev: FormState, formData: FormData): Promise<FormState> {
-  await assertCan("trips.manage");
-  const values = formValues(formData);
-  const parsed = tripSchema.safeParse(values);
-  if (!parsed.success) return failed(parsed.error, values);
-  const { id, challanId, ...data } = parsed.data;
-  const db = await getDb();
-  const savedId = await db.transaction(async (tx) => {
-    if (id) {
-      const [before] = await tx.select().from(trips).where(eq(trips.id, id));
-      if (!before) throw new Error("Trip not found");
-      const [after] = await tx.update(trips).set(data).where(eq(trips.id, id)).returning();
-      await logChange(tx, "trip", id, "update", before, after);
-      return id;
-    }
-    const [created] = await tx.insert(trips).values(data).returning();
-    if (!created) throw new Error("Insert failed");
-    await logChange(tx, "trip", created.id, "create", null, created);
-    if (challanId) {
-      const loaded = await tx
-        .update(challans)
-        .set({ tripId: created.id, status: "loaded" })
-        .where(
-          and(
-            eq(challans.id, challanId),
-            isNull(challans.tripId),
-            eq(challans.status, "booked"),
-            eq(challans.isCancelled, false),
-          ),
-        )
-        .returning({ id: challans.id });
-      for (const c of loaded)
-        await logChange(
-          tx,
-          "challan",
-          c.id,
-          "update",
-          { tripId: null },
-          { tripId: created.id, status: "loaded" },
-        );
-    }
-    return created.id;
+  return guardForm(formData, async () => {
+    await assertCan("trips.manage");
+    const values = formValues(formData);
+    const parsed = tripSchema.safeParse(values);
+    if (!parsed.success) return failed(parsed.error, values);
+    const { id, challanId, ...data } = parsed.data;
+    const db = await getDb();
+    const savedId = await db.transaction(async (tx) => {
+      if (id) {
+        const [before] = await tx.select().from(trips).where(eq(trips.id, id));
+        if (!before) throw new Error("Trip not found");
+        const [after] = await tx.update(trips).set(data).where(eq(trips.id, id)).returning();
+        await logChange(tx, "trip", id, "update", before, after);
+        return id;
+      }
+      const [created] = await tx.insert(trips).values(data).returning();
+      if (!created) throw new Error("Insert failed");
+      await logChange(tx, "trip", created.id, "create", null, created);
+      if (challanId) {
+        const loaded = await tx
+          .update(challans)
+          .set({ tripId: created.id, status: "loaded" })
+          .where(
+            and(
+              eq(challans.id, challanId),
+              isNull(challans.tripId),
+              eq(challans.status, "booked"),
+              eq(challans.isCancelled, false),
+            ),
+          )
+          .returning({ id: challans.id });
+        for (const c of loaded)
+          await logChange(
+            tx,
+            "challan",
+            c.id,
+            "update",
+            { tripId: null },
+            { tripId: created.id, status: "loaded" },
+          );
+      }
+      return created.id;
+    });
+    refreshDesk();
+    redirect(`/trips/${savedId}`);
   });
-  refreshDesk();
-  redirect(`/trips/${savedId}`);
 }
 
 /**

@@ -16,11 +16,11 @@ export function EmployeeForm({
   t: Pick<Strings, "common" | "salary" | "roles">;
   initial: Record<string, string>;
 }) {
-  const { formAction, v, e, hasErrors } = useForm(saveEmployee, initial);
+  const { state, formAction, v, e } = useForm(saveEmployee, initial);
   const c = t.common;
   return (
     <form action={formAction} className="grid max-w-xl gap-5">
-      <FormError show={hasErrors} message={c.fixErrors} />
+      <FormError state={state} c={c} />
       {initial.id ? <input type="hidden" name="id" value={initial.id} /> : null}
       <Field id="name" label={c.name} error={e("name")} c={c}>
         <TextInput id="name" name="name" defaultValue={v("name")} invalid={Boolean(e("name"))} />

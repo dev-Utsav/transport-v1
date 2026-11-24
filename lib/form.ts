@@ -11,7 +11,14 @@ export type FormState = {
   values: Record<string, string>;
   /** step of a multi-step form to reopen on error */
   step?: number;
+  /** the save itself failed (not the input): "denied" = no permission, "busy" = try again */
+  failure?: SaveFailure;
+  /** short id printed in the server log next to the real error, to quote to support */
+  ref?: string;
 };
+
+export const SAVE_FAILURES = ["denied", "busy", "taken", "server"] as const;
+export type SaveFailure = (typeof SAVE_FAILURES)[number];
 
 export const EMPTY_FORM: FormState = { ok: false, errors: {}, values: {} };
 

@@ -43,7 +43,7 @@ export function ChallanForm({
   places: string[];
   initial: Record<string, string>;
 }) {
-  const { state, formAction, v, e, hasErrors } = useForm(createChallan, initial);
+  const { state, formAction, v, e } = useForm(createChallan, initial);
   const c = t.common;
   const formRef = useRef<HTMLFormElement>(null);
   const [step, setStep] = useState(0);
@@ -169,7 +169,7 @@ export function ChallanForm({
           </li>
         ))}
       </ol>
-      <FormError show={hasErrors} message={c.fixErrors} />
+      <FormError state={state} c={c} />
 
       <datalist id="places">
         {places.map((p) => (

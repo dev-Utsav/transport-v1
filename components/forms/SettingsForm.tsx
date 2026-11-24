@@ -16,13 +16,13 @@ export function SettingsForm({
   t: Pick<Strings, "common" | "settings" | "gstModes">;
   initial: Record<string, string>;
 }) {
-  const { formAction, v, e, hasErrors } = useForm(saveSettings, initial);
+  const { state, formAction, v, e } = useForm(saveSettings, initial);
   const c = t.common;
   const s = t.settings;
   const group = "grid gap-5 rounded-card bg-card p-5 shadow-card ring-1 ring-rule sm:p-6";
   return (
     <form action={formAction} className="grid gap-6">
-      <FormError show={hasErrors} message={c.fixErrors} />
+      <FormError state={state} c={c} />
       <fieldset className={group}>
         <legend className="float-left mb-1 text-[18px] font-bold">{s.business}</legend>
         <Field id="businessName" label={s.businessName} c={c} className="clear-left">

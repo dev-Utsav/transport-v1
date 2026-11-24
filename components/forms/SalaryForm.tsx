@@ -29,7 +29,7 @@ export function SalaryForm({
   isPaid: boolean;
   initial: Record<string, string>;
 }) {
-  const { formAction, v, e, hasErrors } = useForm(saveSalaryEntry, initial);
+  const { state, formAction, v, e } = useForm(saveSalaryEntry, initial);
   const c = t.common;
   const [live, setLive] = useState(() => readLive(initial));
 
@@ -54,7 +54,7 @@ export function SalaryForm({
 
   return (
     <form action={formAction} onInput={onInput} className="grid max-w-xl gap-5">
-      <FormError show={hasErrors} message={c.fixErrors} />
+      <FormError state={state} c={c} />
       <input type="hidden" name="staffId" value={initial.staffId} />
       <input type="hidden" name="month" value={month} />
       <div className="grid grid-cols-3 gap-3">

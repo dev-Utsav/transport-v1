@@ -2,6 +2,50 @@
 
 Newest entry at the top. Rules: `../CLAUDE.md`. Client brief: `Transport Management System Feature Document.docx` (this folder).
 
+## 2026-11-24: hardening before the first deploy (branch `fix/pre-deploy-hardening`)
+
+Asked by the backend consultant: security and backend testing for 5–6 users, every error handled without exposing raw errors or blocking the app, then staging and production today. Context was built with code-review-graph (203 files, 732 nodes).
+
+### Errors never replace the screen
+
+- **`guardForm()`** (`server/guard.ts`) wraps all 14 form actions. `redirect` / `notFound` pass through (`unstable_rethrow`); signed out → login page; no permission → "denied"; anything else is logged as `[save failed] ref=xxxxxxxx` and the form comes back **with what was typed** and a plain message plus the reference. The raw error never reaches the browser.
+- `AccessError` (signedOut / denied) replaces the plain `Error` in `assertCan`.
+- `FormError` shows the failure messages (en + hi, `common.saveFailed`). `lib/failure.ts` maps database error codes to busy / taken / server.
+- New `app/error.tsx` (sign-in and other screens outside the desk) and `app/global-error.tsx` (root layout).
+- Already fine: a failed DB start isn't cached (the next request reconnects); production Next hides error messages (digest only).
+
+### Security fixes (each with a test that failed before)
+
+1. **Office could download the salary register** (`/api/export/salary` checked only `reports.export`). Now also needs `salary.view`; the Reports page hides the link.
+2. **Login hashed any password length** (up to the 2 MB body limit). Over 200 characters is refused before scrypt.
+3. **Supabase Data API:** migration `0001_enable_rls` switches row level security on for every table (the app is the owner, so it's unaffected); `tests/unit/rls.test.ts` fails if a new table forgets it. DEPLOY.md also turns the Data API off.
+
+### Testing
+
+- `tests/integrated/failures.test.ts`: DB failure mid-save (values kept, nothing written, no raw text, ref logged), denied role, salary export, oversized password.
+- `tests/end-to-end/multi-user.spec.ts`: six signed-in devices at once; 4 book 8 challans simultaneously (all saved, 8 distinct numbers) while the driver and helper keep their limits.
+- Playwright runs against staging with `E2E_BASE_URL` / `E2E_PASSWORD` / `VERCEL_BYPASS`. `SEED_DEMO=1` now seeds Postgres too, except on `VERCEL_ENV=production`.
+- `pnpm check` and `pnpm test:e2e`: all pass (148 E2E).
+
+### Deploy
+
+`docs/DEPLOY.md`: two Supabase projects (staging, prod), one Vercel project (Preview = staging, Production = prod), secrets generated straight into Vercel.
+
+### Staging database (same day)
+
+- Supabase project `zxbsrzbgytpigyjqvbuz` is **staging**, in **Singapore** (pooler `aws-1-ap-southeast-1`). Production gets a new project in **Mumbai** next to the app (bom1). Decided with the consultant.
+- Its direct connection is IPv6-only, so Vercel uses the Session pooler. The URL and the generated staging secrets are in git-ignored `.env.staging.local`.
+- **`scripts/migrate.ts` had never run:** top-level await in a CommonJS script (`tsx` without `"type": "module"`). Wrapped in `main()`. Both migrations applied: 17 tables, all with RLS; the app user owns them (bypasses RLS).
+- Local production build against staging: **E2E 148 passed** on real Postgres through the pooler (six devices: 20 challans, 20 distinct numbers). Practice desk opened by hand: its own `practice` schema through the pooler, real tables untouched.
+- Not covered by any test yet: **the practice desk on Postgres** (only checked by hand).
+
+### Open points (new)
+
+10. **Cash book shows cash salary payments by name to the office role.** Normal for a cash book, but the client should confirm office may see them.
+11. **Login rate limit is per server instance** (in memory). Fine for 5–6 users with scrypt; move it to the database if logins are attacked.
+12. **Nightly backups live in the same database.** Download one weekly (Settings → Backup) or use Supabase Pro daily backups.
+13. **Vercel Hobby is non-commercial only**: the client needs Pro.
+
 ## 2026-11-21 (evening): one staff table, logins per person with roles, migrations squashed
 
 Asked by the backend consultant (after the client asked for admin access): roles **admin / office / driver / helper**, **a driver sees only their own trips**, drivers and employees merged, no new migrations.

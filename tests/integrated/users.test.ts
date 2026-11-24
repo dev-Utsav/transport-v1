@@ -153,8 +153,8 @@ describe("managing users (admin)", () => {
   it("only an admin may manage users", async () => {
     const { db } = testDb();
     await signInAs(db, "office");
-    await expect(saveUser(EMPTY_FORM, form({ name: "X", login: "x2" }))).rejects.toThrow(
-      "Not allowed",
-    );
+    const out = await saveUser(EMPTY_FORM, form({ name: "X", login: "x2" }));
+    expect(out.failure).toBe("denied");
+    expect(out.values.login).toBe("x2");
   });
 });

@@ -12,7 +12,7 @@ import { logChange } from "@/server/audit";
 import { getDb } from "@/server/db";
 import { settings } from "@/server/db/schema";
 import { assertCan } from "@/server/auth";
-import { refreshDesk } from "@/server/guard";
+import { guardForm, refreshDesk } from "@/server/guard";
 
 const settingsSchema = z.object({
   businessName: zf.optionalText,
@@ -40,28 +40,30 @@ const settingsSchema = z.object({
 });
 
 export async function saveSettings(_prev: FormState, formData: FormData): Promise<FormState> {
-  await assertCan("settings.manage");
-  const values = formValues(formData);
-  const parsed = settingsSchema.safeParse(values);
-  if (!parsed.success) return failed(parsed.error, values);
-  const { gstRate, ...rest } = parsed.data;
-  const db = await getDb();
-  const result = await db.transaction(async (tx) => {
-    const [before] = await tx.select().from(settings).where(eq(settings.id, 1));
-    if (!before) throw new Error("Settings row missing");
-    // Numbers only move forward: a lower "next" would reuse printed challan numbers.
-    if (rest.nextChallanNo < before.nextChallanNo) return "backwards" as const;
-    const [after] = await tx
-      .update(settings)
-      .set({ ...rest, gstRateBp: gstRate })
-      .where(eq(settings.id, 1))
-      .returning();
-    await logChange(tx, "settings", 1, "update", before, after);
-    return "ok" as const;
+  return guardForm(formData, async () => {
+    await assertCan("settings.manage");
+    const values = formValues(formData);
+    const parsed = settingsSchema.safeParse(values);
+    if (!parsed.success) return failed(parsed.error, values);
+    const { gstRate, ...rest } = parsed.data;
+    const db = await getDb();
+    const result = await db.transaction(async (tx) => {
+      const [before] = await tx.select().from(settings).where(eq(settings.id, 1));
+      if (!before) throw new Error("Settings row missing");
+      // Numbers only move forward: a lower "next" would reuse printed challan numbers.
+      if (rest.nextChallanNo < before.nextChallanNo) return "backwards" as const;
+      const [after] = await tx
+        .update(settings)
+        .set({ ...rest, gstRateBp: gstRate })
+        .where(eq(settings.id, 1))
+        .returning();
+      await logChange(tx, "settings", 1, "update", before, after);
+      return "ok" as const;
+    });
+    if (result === "backwards") return { ok: false, errors: { nextChallanNo: "invalid" }, values };
+    refreshDesk();
+    redirect("/settings?saved=1");
   });
-  if (result === "backwards") return { ok: false, errors: { nextChallanNo: "invalid" }, values };
-  refreshDesk();
-  redirect("/settings?saved=1");
 }
 
 export async function addCategory(formData: FormData): Promise<void> {

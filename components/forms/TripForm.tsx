@@ -20,11 +20,11 @@ export function TripForm({
   places: string[];
   initial: Record<string, string>;
 }) {
-  const { formAction, v, e, hasErrors } = useForm(saveTrip, initial);
+  const { state, formAction, v, e } = useForm(saveTrip, initial);
   const c = t.common;
   return (
     <form action={formAction} className="grid max-w-xl gap-5">
-      <FormError show={hasErrors} message={c.fixErrors} />
+      <FormError state={state} c={c} />
       {initial.id ? <input type="hidden" name="id" value={initial.id} /> : null}
       {initial.challanId ? (
         <input type="hidden" name="challanId" value={initial.challanId} />
