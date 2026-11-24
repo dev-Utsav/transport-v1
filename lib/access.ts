@@ -15,6 +15,7 @@ export const PERMISSIONS = [
   "challans.edit",
   "challans.cancel",
   "trips.view",
+  "trips.all", // every trip; without it a driver sees only trips where they are the driver
   "trips.manage", // new / edit trip, correct a status
   "trips.load", // put parcels on a loading truck, take them off
   "trips.advance", // truck has left, truck has arrived, close
@@ -55,8 +56,9 @@ export const ROLE_NAMES = {
  * - admin: everything (never stored short; topped up on every start).
  * - office: the day's desk work. Cancelling money records, salaries, settings, backups,
  *   change history and logins stay with the admin.
- * - driver: their road work: see trips and parcels, mark left / arrived, deliver and collect.
- * - helper: loading: see trips and parcels, load and unload.
+ * - driver: only their own trips (no `trips.all`): see them, mark left / arrived, deliver and
+ *   collect. Their login must be linked to their staff record (users.staff_id).
+ * - helper: loading on any truck: see trips and parcels, load and unload.
  */
 export const DEFAULT_ROLE_PERMISSIONS = {
   admin: PERMISSIONS,
@@ -65,6 +67,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     "challans.book",
     "challans.edit",
     "trips.view",
+    "trips.all",
     "trips.manage",
     "trips.load",
     "trips.advance",
@@ -79,8 +82,8 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     "reports.export",
     "masters.manage",
   ],
-  driver: ["challans.view", "trips.view", "trips.advance", "trips.deliver"],
-  helper: ["challans.view", "trips.view", "trips.load"],
+  driver: ["trips.view", "trips.advance", "trips.deliver"],
+  helper: ["challans.view", "trips.view", "trips.all", "trips.load"],
 } as const satisfies Record<SystemRole, readonly Permission[]>;
 
 export function isPermission(value: string): value is Permission {

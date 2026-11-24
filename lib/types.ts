@@ -21,8 +21,9 @@ export type TruckOwner = (typeof TRUCK_OWNERS)[number];
 export const VENDOR_KINDS = ["sender", "receiver", "both"] as const;
 export type VendorKind = (typeof VENDOR_KINDS)[number];
 
-export const EMPLOYEE_ROLES = ["driver", "helper", "office"] as const;
-export type EmployeeRole = (typeof EMPLOYEE_ROLES)[number];
+/** Job role of a staff member (what they do). Login access is separate (lib/access.ts). */
+export const STAFF_ROLES = ["driver", "helper", "office"] as const;
+export type StaffRole = (typeof STAFF_ROLES)[number];
 
 /** Built-in expense categories; the admin can add more in Settings (stored as plain text). */
 export const DEFAULT_EXPENSE_CATEGORIES = [

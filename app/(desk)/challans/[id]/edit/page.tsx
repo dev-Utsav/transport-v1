@@ -5,6 +5,7 @@ import { ChallanEditForm } from "@/components/forms/ChallanEditForm";
 import { PageHead } from "@/components/ui/PageHead";
 import { formatChallanNo } from "@/lib/challan-no";
 import { formatDay } from "@/lib/dates";
+import { requireAccess } from "@/server/auth";
 import { getT } from "@/server/lang";
 import { getChallan, placeOptions } from "@/server/queries/challans";
 import { tripOptions } from "@/server/queries/trips";
@@ -13,6 +14,7 @@ import { getSettings } from "@/server/settings";
 export const metadata: Metadata = { title: "Edit challan" };
 
 export default async function EditChallanPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireAccess("challans.edit");
   const id = Number((await params).id);
   const [t, settings, data, trips, places] = await Promise.all([
     getT(),

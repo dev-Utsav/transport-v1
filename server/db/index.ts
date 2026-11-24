@@ -63,8 +63,9 @@ async function connectReal(): Promise<Database> {
   const db = await pgliteDb("pglite");
   await ensureSettings(db);
   if (process.env.SEED_DEMO === "1") {
-    const { seedSampleIfEmpty } = await import("@/server/db/sample");
+    const { seedDemoLogins, seedSampleIfEmpty } = await import("@/server/db/sample");
     await seedSampleIfEmpty(db);
+    await seedDemoLogins(db, process.env.APP_PASSWORD ?? "demo-password");
   }
   return db;
 }

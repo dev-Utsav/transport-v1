@@ -12,7 +12,8 @@ import { logChange } from "@/server/audit";
 import type { Tx } from "@/server/db";
 import { getDb } from "@/server/db";
 import { challans, payments, settings, trips, vendors } from "@/server/db/schema";
-import { assertAdmin, refreshDesk } from "@/server/guard";
+import { assertCan } from "@/server/auth";
+import { refreshDesk } from "@/server/guard";
 
 /** A party picker: an existing id, or "new" with a name (and phone) typed in place. */
 const partyPick = z.union([z.literal("new"), z.coerce.number().int().positive()]);
@@ -90,7 +91,7 @@ async function resolveParty(
 }
 
 export async function createChallan(_prev: FormState, formData: FormData): Promise<FormState> {
-  await assertAdmin();
+  await assertCan("challans.book");
   const values = formValues(formData);
   const parsed = challanSchema.safeParse(values);
   if (!parsed.success) {
@@ -183,7 +184,7 @@ const editSchema = z.object({
 
 /** Goods and trip can be corrected; money can't (cancel and book again, so the ledger stays true). */
 export async function editChallan(_prev: FormState, formData: FormData): Promise<FormState> {
-  await assertAdmin();
+  await assertCan("challans.edit");
   const values = formValues(formData);
   const parsed = editSchema.safeParse(values);
   if (!parsed.success) return failed(parsed.error, values);
@@ -200,7 +201,7 @@ export async function editChallan(_prev: FormState, formData: FormData): Promise
 }
 
 export async function setChallanStatus(formData: FormData): Promise<void> {
-  await assertAdmin();
+  await assertCan("challans.edit");
   const { id, status } = z
     .object({ id: zf.id, status: z.enum(CHALLAN_STATUSES) })
     .parse({ id: formData.get("id"), status: formData.get("status") });
@@ -216,7 +217,7 @@ export async function setChallanStatus(formData: FormData): Promise<void> {
 
 /** Cancels the challan and any payment recorded against it, in one go. */
 export async function cancelChallan(formData: FormData): Promise<void> {
-  await assertAdmin();
+  await assertCan("challans.cancel");
   const id = zf.id.parse(formData.get("id"));
   const db = await getDb();
   await db.transaction(async (tx) => {

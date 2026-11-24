@@ -6,12 +6,14 @@ import { ReportTable } from "@/components/domain/ReportTable";
 import { PageHead } from "@/components/ui/PageHead";
 import { Empty } from "@/components/ui/Rows";
 import { formatMoney } from "@/lib/money";
+import { requireAccess } from "@/server/auth";
 import { getT } from "@/server/lang";
 import { listVendorBalances } from "@/server/queries/vendors";
 
 export const metadata: Metadata = { title: "Party outstanding" };
 
 export default async function OutstandingPage() {
+  await requireAccess("reports.view");
   const [t, rows] = await Promise.all([getT(), listVendorBalances({ dueOnly: true })]);
   const total = rows.reduce((s, r) => s + r.balance, 0);
   return (

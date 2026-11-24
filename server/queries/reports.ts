@@ -9,7 +9,7 @@ import {
   expenses,
   payments,
   salaryMonths,
-  employees,
+  staff,
   trips,
   trucks,
   vendors,
@@ -57,10 +57,10 @@ export async function cashBook(day: string) {
       .select({
         id: salaryMonths.id,
         amount: orZero(salaryMonths.paidAmount),
-        name: employees.name,
+        name: staff.name,
       })
       .from(salaryMonths)
-      .innerJoin(employees, eq(employees.id, salaryMonths.employeeId))
+      .innerJoin(staff, eq(staff.id, salaryMonths.staffId))
       .where(and(cashSal, eq(salaryMonths.paidOn, day))),
   ]);
   const opening =

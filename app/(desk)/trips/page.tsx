@@ -4,6 +4,7 @@ import { TripRow } from "@/components/domain/TripRow";
 import { ButtonLink } from "@/components/ui/Button";
 import { PageHead, Section } from "@/components/ui/PageHead";
 import { Empty, RowList } from "@/components/ui/Rows";
+import { can, requireAccess, tripScope } from "@/server/auth";
 import { getT } from "@/server/lang";
 import { listTrips } from "@/server/queries/trips";
 
@@ -11,7 +12,14 @@ export const metadata: Metadata = { title: "Trips" };
 
 /** Trucks in flow order: loading (step 2), on the road (3), arrived to deliver (4), then closed. */
 export default async function TripsPage() {
-  const [t, open, closed] = await Promise.all([getT(), listTrips("open"), listTrips("closed")]);
+  const actor = await requireAccess("trips.view");
+  const scope = tripScope(actor);
+  const [t, open, closed] = await Promise.all([
+    getT(),
+    listTrips("open", scope),
+    listTrips("closed", scope),
+  ]);
+  const canStart = can(actor, "trips.manage");
   const groups = [
     {
       id: "loading",
@@ -38,9 +46,11 @@ export default async function TripsPage() {
         title={t.trips.title}
         sub={t.flow.help1.load}
         actions={
-          <ButtonLink href="/trips/new" icon="plus">
-            {t.trips.new}
-          </ButtonLink>
+          canStart ? (
+            <ButtonLink href="/trips/new" icon="plus">
+              {t.trips.new}
+            </ButtonLink>
+          ) : null
         }
       />
       <div className="grid gap-8">

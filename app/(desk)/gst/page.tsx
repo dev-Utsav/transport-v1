@@ -11,6 +11,7 @@ import { formatChallanNo } from "@/lib/challan-no";
 import { formatDay, formatMonth, istMonth, isMonth, shiftMonth } from "@/lib/dates";
 import { formatRate } from "@/lib/gst";
 import { formatMoney } from "@/lib/money";
+import { requireAccess } from "@/server/auth";
 import { getT } from "@/server/lang";
 import { gstSummary } from "@/server/queries/reports";
 import { getSettings } from "@/server/settings";
@@ -22,6 +23,7 @@ export default async function GstPage({
 }: {
   searchParams: Promise<{ month?: string }>;
 }) {
+  await requireAccess("gst.view");
   const { month: m = "" } = await searchParams;
   const thisMonth = istMonth();
   const month = isMonth(m) ? m : thisMonth;

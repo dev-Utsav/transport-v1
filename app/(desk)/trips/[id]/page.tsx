@@ -7,6 +7,7 @@ import { Money } from "@/components/domain/Money";
 import { LoadPanel } from "@/components/domain/trip/LoadPanel";
 import { TripLoadList } from "@/components/domain/trip/TripLoadList";
 import { TripNextAction } from "@/components/domain/trip/TripNextAction";
+import type { TripCan } from "@/components/domain/trip/trip-can";
 import { ButtonLink } from "@/components/ui/Button";
 import { PageHead, Section } from "@/components/ui/PageHead";
 import { Empty, RowList } from "@/components/ui/Rows";
@@ -15,6 +16,7 @@ import { categoryLabel } from "@/content/strings";
 import { formatDay } from "@/lib/dates";
 import { tripStage } from "@/lib/flow";
 import { formatMoney } from "@/lib/money";
+import { can, requireAccess, tripScope } from "@/server/auth";
 import { getT } from "@/server/lang";
 import { waitingChallans } from "@/server/queries/flow";
 import { getTripDetail } from "@/server/queries/trips";
@@ -28,10 +30,24 @@ export const metadata: Metadata = { title: "Trip" };
  */
 export default async function TripPage({ params }: { params: Promise<{ id: string }> }) {
   const id = Number((await params).id);
-  const [t, settings, detail] = await Promise.all([getT(), getSettings(), getTripDetail(id)]);
+  const actor = await requireAccess("trips.view");
+  const [t, settings, detail] = await Promise.all([
+    getT(),
+    getSettings(),
+    getTripDetail(id, tripScope(actor)),
+  ]);
   if (!detail) notFound();
   const { trip, groups, totals, expenses } = detail;
-  const waiting = trip.status === "loading" ? await waitingChallans() : [];
+  const allowed: TripCan = {
+    manage: can(actor, "trips.manage"),
+    load: can(actor, "trips.load"),
+    advance: can(actor, "trips.advance"),
+    deliver: can(actor, "trips.deliver"),
+    openChallans: can(actor, "challans.view"),
+    openParties: can(actor, "parties.view"),
+  };
+  const showMoney = can(actor, "expenses.view");
+  const waiting = trip.status === "loading" && allowed.load ? await waitingChallans() : [];
 
   return (
     <>
@@ -47,17 +63,19 @@ export default async function TripPage({ params }: { params: Promise<{ id: strin
             <ButtonLink href={`/trips/${trip.id}/print`} variant="secondary" icon="print">
               {t.tripFlow.manifest}
             </ButtonLink>
-            <ButtonLink href={`/trips/${trip.id}/edit`} variant="secondary">
-              {t.common.edit}
-            </ButtonLink>
+            {allowed.manage ? (
+              <ButtonLink href={`/trips/${trip.id}/edit`} variant="secondary">
+                {t.common.edit}
+              </ButtonLink>
+            ) : null}
           </>
         }
       />
 
       <div className="grid gap-8">
-        <TripNextAction t={t} trip={trip} undelivered={totals.undelivered} />
+        <TripNextAction t={t} trip={trip} undelivered={totals.undelivered} can={allowed} />
 
-        {trip.status === "loading" ? (
+        {trip.status === "loading" && allowed.load ? (
           <LoadPanel
             t={t}
             tripId={trip.id}
@@ -81,49 +99,54 @@ export default async function TripPage({ params }: { params: Promise<{ id: strin
             ]}
           />
           {groups.length ? (
-            <TripLoadList t={t} detail={detail} prefix={settings.challanPrefix} />
+            <TripLoadList t={t} detail={detail} prefix={settings.challanPrefix} can={allowed} />
           ) : (
             <Empty>{t.trips.noChallans}</Empty>
           )}
         </Section>
 
-        <Section
-          title={t.trips.expenses}
-          action={
-            <Link
-              href={`/expenses/new?trip=${trip.id}`}
-              className="text-[15px] font-semibold text-signal-ink hover:underline"
-            >
-              + {t.expenses.new}
-            </Link>
-          }
-        >
-          <RowList>
-            {expenses.map((e) => (
-              <li key={e.id} className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5">
-                <span>
-                  {categoryLabel(t, e.category)}{" "}
-                  <span className="text-[14px] text-ink-2">· {formatDay(e.day)}</span>
-                </span>
-                <Money paise={e.amount} className="font-semibold" />
+        {showMoney ? (
+          <Section
+            title={t.trips.expenses}
+            action={
+              <Link
+                href={`/expenses/new?trip=${trip.id}`}
+                className="text-[15px] font-semibold text-signal-ink hover:underline"
+              >
+                + {t.expenses.new}
+              </Link>
+            }
+          >
+            <RowList>
+              {expenses.map((e) => (
+                <li
+                  key={e.id}
+                  className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5"
+                >
+                  <span>
+                    {categoryLabel(t, e.category)}{" "}
+                    <span className="text-[14px] text-ink-2">· {formatDay(e.day)}</span>
+                  </span>
+                  <Money paise={e.amount} className="font-semibold" />
+                </li>
+              ))}
+              <li className="grid gap-1 bg-paper/60 px-4 py-3.5 sm:px-5">
+                <div className="flex justify-between gap-3 text-[15px] text-ink-2">
+                  <span>
+                    {t.trips.freight} − {t.trips.expenses}
+                  </span>
+                  <span className="num">
+                    {formatMoney(totals.freight)} − {formatMoney(totals.spent)}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-3 text-[18px] font-bold">
+                  <span>{t.trips.profit}</span>
+                  <Money paise={totals.profit} tone={totals.profit < 0 ? "due" : "in"} />
+                </div>
               </li>
-            ))}
-            <li className="grid gap-1 bg-paper/60 px-4 py-3.5 sm:px-5">
-              <div className="flex justify-between gap-3 text-[15px] text-ink-2">
-                <span>
-                  {t.trips.freight} − {t.trips.expenses}
-                </span>
-                <span className="num">
-                  {formatMoney(totals.freight)} − {formatMoney(totals.spent)}
-                </span>
-              </div>
-              <div className="flex justify-between gap-3 text-[18px] font-bold">
-                <span>{t.trips.profit}</span>
-                <Money paise={totals.profit} tone={totals.profit < 0 ? "due" : "in"} />
-              </div>
-            </li>
-          </RowList>
-        </Section>
+            </RowList>
+          </Section>
+        ) : null}
       </div>
     </>
   );

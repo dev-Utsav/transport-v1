@@ -22,6 +22,7 @@ import { formatRate } from "@/lib/gst";
 import { formatMoney } from "@/lib/money";
 import { CHALLAN_STATUSES } from "@/lib/types";
 import { waLink } from "@/lib/whatsapp";
+import { requireAccess } from "@/server/auth";
 import { cancelChallan, setChallanStatus } from "@/server/actions/challans";
 import { getT } from "@/server/lang";
 import { historyOf } from "@/server/queries/audit";
@@ -38,6 +39,7 @@ export default async function ChallanPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ saved?: string }>;
 }) {
+  await requireAccess("challans.view");
   const id = Number((await params).id);
   const [{ saved }, t, settings, data, history, loading] = await Promise.all([
     searchParams,

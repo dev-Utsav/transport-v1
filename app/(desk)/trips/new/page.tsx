@@ -6,6 +6,7 @@ import { ButtonLink } from "@/components/ui/Button";
 import { PageHead } from "@/components/ui/PageHead";
 import { Empty } from "@/components/ui/Rows";
 import { istDay } from "@/lib/dates";
+import { requireAccess } from "@/server/auth";
 import { getT } from "@/server/lang";
 import { getChallan, placeOptions } from "@/server/queries/challans";
 import { driverOptions, truckOptions } from "@/server/queries/trips";
@@ -17,6 +18,7 @@ export default async function NewTripPage({
 }: {
   searchParams: Promise<{ challan?: string }>;
 }) {
+  await requireAccess("trips.manage");
   const { challan } = await searchParams;
   const challanId = Number(challan) || 0;
   const [t, trucks, drivers, places, parcel] = await Promise.all([

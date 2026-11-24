@@ -11,7 +11,8 @@ import { GST_MODES } from "@/lib/types";
 import { logChange } from "@/server/audit";
 import { getDb } from "@/server/db";
 import { settings } from "@/server/db/schema";
-import { assertAdmin, refreshDesk } from "@/server/guard";
+import { assertCan } from "@/server/auth";
+import { refreshDesk } from "@/server/guard";
 
 const settingsSchema = z.object({
   businessName: zf.optionalText,
@@ -39,7 +40,7 @@ const settingsSchema = z.object({
 });
 
 export async function saveSettings(_prev: FormState, formData: FormData): Promise<FormState> {
-  await assertAdmin();
+  await assertCan("settings.manage");
   const values = formValues(formData);
   const parsed = settingsSchema.safeParse(values);
   if (!parsed.success) return failed(parsed.error, values);
@@ -64,7 +65,7 @@ export async function saveSettings(_prev: FormState, formData: FormData): Promis
 }
 
 export async function addCategory(formData: FormData): Promise<void> {
-  await assertAdmin();
+  await assertCan("settings.manage");
   const name = z.string().trim().min(1).max(40).safeParse(formData.get("category"));
   if (!name.success) return;
   const db = await getDb();

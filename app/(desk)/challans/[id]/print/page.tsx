@@ -9,6 +9,7 @@ import { formatDayFull } from "@/lib/dates";
 import { formatRate } from "@/lib/gst";
 import { formatAmount, formatMoney } from "@/lib/money";
 import { amountInWords } from "@/lib/words";
+import { requireAccess } from "@/server/auth";
 import { getT } from "@/server/lang";
 import { getChallan } from "@/server/queries/challans";
 import { getSettings } from "@/server/settings";
@@ -26,6 +27,7 @@ export default async function PrintChallanPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ as?: string }>;
 }) {
+  await requireAccess("challans.view");
   const id = Number((await params).id);
   const [{ as }, t, settings, data] = await Promise.all([
     searchParams,

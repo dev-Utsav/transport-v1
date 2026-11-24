@@ -8,6 +8,7 @@ import { COLLECT_TONE, Pill } from "@/components/ui/Pill";
 import { Empty, RowList, RowLink } from "@/components/ui/Rows";
 import { formatChallanNo } from "@/lib/challan-no";
 import { formatDay, isDay } from "@/lib/dates";
+import { requireAccess } from "@/server/auth";
 import { getT } from "@/server/lang";
 import { searchChallans } from "@/server/queries/challans";
 import { getSettings } from "@/server/settings";
@@ -19,6 +20,7 @@ export default async function ChallansPage({
 }: {
   searchParams: Promise<{ q?: string; day?: string }>;
 }) {
+  await requireAccess("challans.view");
   const { q = "", day = "" } = await searchParams;
   const validDay = isDay(day) ? day : undefined;
   const [t, settings, rows] = await Promise.all([

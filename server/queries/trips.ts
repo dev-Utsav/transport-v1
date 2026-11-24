@@ -5,7 +5,7 @@ import { aliasedTable, and, asc, desc, eq, inArray, ne } from "drizzle-orm";
 import { collectState } from "@/lib/ledger";
 import type { TripStatus } from "@/lib/types";
 import { getDb } from "@/server/db";
-import { challans, drivers, expenses, payments, trips, trucks, vendors } from "@/server/db/schema";
+import { challans, expenses, payments, staff, trips, trucks, vendors } from "@/server/db/schema";
 import { countInt, orZero, sumInt } from "@/server/queries/sql";
 
 const OPEN: TripStatus[] = ["loading", "in_transit", "arrived"];
@@ -33,28 +33,34 @@ async function tripTotalsQuery() {
       expectedOn: trips.expectedOn,
       status: trips.status,
       truckNumber: trucks.number,
-      driverName: drivers.name,
+      driverName: staff.name,
       challanCount: orZero(load.challanCount),
       packages: orZero(load.packages),
       freight: orZero(load.freight),
     })
     .from(trips)
     .innerJoin(trucks, eq(trucks.id, trips.truckId))
-    .leftJoin(drivers, eq(drivers.id, trips.driverId))
+    .leftJoin(staff, eq(staff.id, trips.driverId))
     .leftJoin(load, eq(load.tripId, trips.id));
   return { query };
 }
 
 export type TripListRow = Awaited<ReturnType<typeof listTrips>>[number];
 
-/** Open trips (all of them) or closed ones (latest first, capped). */
-export async function listTrips(which: "open" | "closed") {
+/**
+ * Open trips (all of them) or closed ones (latest first, capped).
+ * `driverId` (from tripScope) limits a driver to trips they drive; null = every trip.
+ */
+export async function listTrips(which: "open" | "closed", driverId: number | null = null) {
   const { query } = await tripTotalsQuery();
+  const mine = driverId === null ? undefined : eq(trips.driverId, driverId);
   if (which === "open") {
-    return query.where(inArray(trips.status, OPEN)).orderBy(desc(trips.departOn), desc(trips.id));
+    return query
+      .where(and(inArray(trips.status, OPEN), mine))
+      .orderBy(desc(trips.departOn), desc(trips.id));
   }
   return query
-    .where(eq(trips.status, "closed"))
+    .where(and(eq(trips.status, "closed"), mine))
     .orderBy(desc(trips.departOn), desc(trips.id))
     .limit(100);
 }
@@ -63,7 +69,7 @@ export async function listTrips(which: "open" | "closed") {
  * Trip screen: the trip, every challan on it with parties and what's been received, grouped by
  * the party who pays ("what is on this truck?"), and the trip's expenses. 4 queries in parallel.
  */
-export async function getTripDetail(id: number) {
+export async function getTripDetail(id: number, driverId: number | null = null) {
   const db = await getDb();
   const sender = aliasedTable(vendors, "sender");
   const receiver = aliasedTable(vendors, "receiver");
@@ -90,13 +96,13 @@ export async function getTripDetail(id: number) {
         truckNumber: trucks.number,
         truckType: trucks.type,
         truckOwner: trucks.owner,
-        driverName: drivers.name,
-        driverPhone: drivers.phone,
+        driverName: staff.name,
+        driverPhone: staff.phone,
       })
       .from(trips)
       .innerJoin(trucks, eq(trucks.id, trips.truckId))
-      .leftJoin(drivers, eq(drivers.id, trips.driverId))
-      .where(eq(trips.id, id)),
+      .leftJoin(staff, eq(staff.id, trips.driverId))
+      .where(and(eq(trips.id, id), driverId === null ? undefined : eq(trips.driverId, driverId))),
     db
       .select({
         id: challans.id,
@@ -227,7 +233,11 @@ export async function driverOptions(includeInactive = false) {
   const db = await getDb();
   return db
     .select()
-    .from(drivers)
-    .where(includeInactive ? undefined : eq(drivers.isActive, true))
-    .orderBy(desc(drivers.isActive), asc(drivers.name));
+    .from(staff)
+    .where(
+      includeInactive
+        ? eq(staff.role, "driver")
+        : and(eq(staff.role, "driver"), eq(staff.isActive, true)),
+    )
+    .orderBy(desc(staff.isActive), asc(staff.name));
 }

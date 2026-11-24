@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { FlowBoard } from "@/components/domain/FlowBoard";
 import { GettingStarted } from "@/components/domain/GettingStarted";
@@ -12,6 +13,8 @@ import { Section } from "@/components/ui/PageHead";
 import { RowList } from "@/components/ui/Rows";
 import { formatDayFull, istDay, shiftDay } from "@/lib/dates";
 import { PAY_MODES } from "@/lib/types";
+import type { Permission } from "@/lib/access";
+import { can, requireAccess } from "@/server/auth";
 import { getT } from "@/server/lang";
 import { isPracticeRequest } from "@/server/practice-flag";
 import { flowCounts, setupState } from "@/server/queries/flow";
@@ -21,6 +24,9 @@ import { overdueVendors } from "@/server/queries/vendors";
 import { getSettings } from "@/server/settings";
 
 export default async function HomePage() {
+  const actor = await requireAccess();
+  // The work board is the office's view of every parcel; a driver starts on their own trips.
+  if (!can(actor, "challans.view")) redirect("/trips");
   const today = istDay();
   const [t, settings, practice] = await Promise.all([getT(), getSettings(), isPracticeRequest()]);
   const [counts, money, onRoad, overdue, setup] = await Promise.all([
@@ -32,12 +38,19 @@ export default async function HomePage() {
   ]);
   const needsSetup = !practice && (!setup.hasTruck || !setup.hasParty || !settings.businessName);
 
-  const office: { href: string; label: string; icon: IconName }[] = [
-    { href: "/expenses/new", label: t.home.addExpense, icon: "wallet" },
-    { href: "/payments/new", label: t.home.recordPayment, icon: "rupee" },
-    { href: "/salary", label: t.nav.salary, icon: "idCard" },
-    { href: "/reports", label: t.nav.reports, icon: "chart" },
-  ];
+  const office = (
+    [
+      { href: "/expenses/new", label: t.home.addExpense, icon: "wallet", need: "expenses.record" },
+      {
+        href: "/payments/new",
+        label: t.home.recordPayment,
+        icon: "rupee",
+        need: "payments.record",
+      },
+      { href: "/salary", label: t.nav.salary, icon: "idCard", need: "salary.view" },
+      { href: "/reports", label: t.nav.reports, icon: "chart", need: "reports.view" },
+    ] satisfies { href: string; label: string; icon: IconName; need: Permission }[]
+  ).filter((o) => can(actor, o.need));
 
   return (
     <div className="grid gap-8">
@@ -152,22 +165,24 @@ export default async function HomePage() {
         </Section>
       ) : null}
 
-      <Section title={t.office.title}>
-        <p className="-mt-2 text-[15px] text-ink-2">{t.office.help}</p>
-        <ul className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-          {office.map((a) => (
-            <li key={a.href}>
-              <Link
-                href={a.href}
-                className="flex min-h-14 items-center gap-3 rounded-card bg-card px-4 text-[15px] font-semibold shadow-card ring-1 ring-rule hover:ring-rule-strong"
-              >
-                <Icon name={a.icon} size={22} className="text-signal" />
-                {a.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </Section>
+      {office.length ? (
+        <Section title={t.office.title}>
+          <p className="-mt-2 text-[15px] text-ink-2">{t.office.help}</p>
+          <ul className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+            {office.map((a) => (
+              <li key={a.href}>
+                <Link
+                  href={a.href}
+                  className="flex min-h-14 items-center gap-3 rounded-card bg-card px-4 text-[15px] font-semibold shadow-card ring-1 ring-rule hover:ring-rule-strong"
+                >
+                  <Icon name={a.icon} size={22} className="text-signal" />
+                  {a.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      ) : null}
     </div>
   );
 }

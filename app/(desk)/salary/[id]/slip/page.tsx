@@ -8,6 +8,7 @@ import { formatDayFull, formatMonth, istMonth, isMonth } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
 import { calcSalary } from "@/lib/salary";
 import { amountInWords } from "@/lib/words";
+import { requireAccess } from "@/server/auth";
 import { getT } from "@/server/lang";
 import { getEmployee, getSalaryEntry } from "@/server/queries/salary";
 import { getSettings } from "@/server/settings";
@@ -21,6 +22,7 @@ export default async function SalarySlipPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ month?: string }>;
 }) {
+  await requireAccess("salary.view");
   const id = Number((await params).id);
   const { month: m = "" } = await searchParams;
   const month = isMonth(m) ? m : istMonth();
@@ -66,7 +68,7 @@ export default async function SalarySlipPage({
           </div>
           <div className="text-right">
             <p className="text-[12px] font-semibold uppercase">{t.salary.joined}</p>
-            <p>{formatDayFull(employee.joinedOn)}</p>
+            <p>{employee.joinedOn ? formatDayFull(employee.joinedOn) : "—"}</p>
           </div>
         </div>
         <table className="mt-4 w-full border-collapse">

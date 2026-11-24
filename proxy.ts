@@ -1,22 +1,18 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-import { SESSION_COOKIE, verifySession } from "@/lib/session";
+import { SESSION_COOKIE, sessionSecret, verifySession } from "@/lib/session";
 
 /**
- * Every page needs the admin session, except the login page and the nightly backup cron
- * (which checks its own secret). In production a missing APP_PASSWORD locks the tool.
+ * First lock: every page needs a validly signed, unexpired session cookie, except the login page
+ * and the nightly backup cron (which checks its own secret). Cheap, no database: whether the user
+ * is still active and what they may open is checked on the page / action (server/auth.ts).
  */
 export async function proxy(request: NextRequest) {
-  const password = process.env.APP_PASSWORD;
-  if (!password) {
-    if (process.env.NODE_ENV === "production") {
-      return new NextResponse("APP_PASSWORD is not set.", { status: 503 });
-    }
-    return NextResponse.next();
-  }
-  const ok = await verifySession(password, request.cookies.get(SESSION_COOKIE)?.value);
-  if (ok) return NextResponse.next();
+  const secret = sessionSecret(process.env.SESSION_SECRET, process.env.NODE_ENV);
+  if (!secret) return new NextResponse("SESSION_SECRET is not set.", { status: 503 });
+  const claims = await verifySession(secret, request.cookies.get(SESSION_COOKIE)?.value);
+  if (claims) return NextResponse.next();
   if (request.nextUrl.pathname.startsWith("/api/")) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }

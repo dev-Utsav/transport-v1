@@ -7,6 +7,7 @@ import { PeriodNav } from "@/components/ui/PeriodNav";
 import { categoryLabel } from "@/content/strings";
 import { formatMonth, istMonth, isMonth, shiftMonth } from "@/lib/dates";
 import { formatCompact, formatMoney } from "@/lib/money";
+import { requireAccess } from "@/server/auth";
 import { getT } from "@/server/lang";
 import { expenseBreakdown } from "@/server/queries/money";
 
@@ -17,6 +18,7 @@ export default async function ExpenseReportPage({
 }: {
   searchParams: Promise<{ month?: string }>;
 }) {
+  await requireAccess("reports.view");
   const { month: m = "" } = await searchParams;
   const thisMonth = istMonth();
   const month = isMonth(m) ? m : thisMonth;

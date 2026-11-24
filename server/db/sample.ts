@@ -9,14 +9,16 @@ import {
   backups,
   billPhotos,
   challans,
-  drivers,
-  employees,
+  staff,
   expenses,
   payments,
+  roles,
   salaryMonths,
   settings,
   trips,
   trucks,
+  userRoles,
+  users,
   vendors,
 } from "@/server/db/schema";
 
@@ -54,12 +56,30 @@ export async function seedSampleIfEmpty(db: Database): Promise<void> {
         },
       ])
       .returning();
+    // One staff record per person: Ramesh and Suresh drive and are on salary; Imran drives the
+    // hired truck and is paid by its owner (off payroll).
     const [r1, r2, r3] = await tx
-      .insert(drivers)
+      .insert(staff)
       .values([
-        { name: "Ramesh Yadav", phone: "9800000001", licence: "GJ0620190012345" },
-        { name: "Suresh Patel", phone: "9800000002", licence: "GJ0620170067890" },
-        { name: "Imran Shaikh", phone: "9800000003", licence: "RJ1420180034567" },
+        {
+          name: "Ramesh Yadav",
+          phone: "9800000001",
+          role: "driver",
+          licence: "GJ0620190012345",
+          onPayroll: true,
+          monthlySalary: 2200000,
+          joinedOn: "2023-04-01",
+        },
+        {
+          name: "Suresh Patel",
+          phone: "9800000002",
+          role: "driver",
+          licence: "GJ0620170067890",
+          onPayroll: true,
+          monthlySalary: 2000000,
+          joinedOn: "2024-01-15",
+        },
+        { name: "Imran Shaikh", phone: "9800000003", role: "driver", licence: "RJ1420180034567" },
       ])
       .returning();
     const [patel, shah, jain, gupta, mehta, agarwal] = await tx
@@ -356,31 +376,27 @@ export async function seedSampleIfEmpty(db: Database): Promise<void> {
       },
       { spentOn: today, amount: 120000, category: "office", mode: "cash", note: "Tea, stationery" },
     ]);
-    const [e1, e2] = await tx
-      .insert(employees)
-      .values([
-        {
-          name: "Ramesh Yadav",
-          role: "driver",
-          monthlySalary: 2200000,
-          joinedOn: "2023-04-01",
-          phone: "9800000001",
-        },
-        {
-          name: "Suresh Patel",
-          role: "driver",
-          monthlySalary: 2000000,
-          joinedOn: "2024-01-15",
-          phone: "9800000002",
-        },
-        { name: "Kishan Rathod", role: "helper", monthlySalary: 1200000, joinedOn: "2024-06-01" },
-        { name: "Neha Desai", role: "office", monthlySalary: 1800000, joinedOn: "2022-08-01" },
-      ])
-      .returning();
+    await tx.insert(staff).values([
+      {
+        name: "Kishan Rathod",
+        role: "helper",
+        onPayroll: true,
+        monthlySalary: 1200000,
+        joinedOn: "2024-06-01",
+      },
+      {
+        name: "Neha Desai",
+        role: "office",
+        onPayroll: true,
+        monthlySalary: 1800000,
+        joinedOn: "2022-08-01",
+      },
+    ]);
+    const [e1, e2] = [r1, r2];
     if (e1 && e2) {
       await tx.insert(salaryMonths).values([
         {
-          employeeId: e1.id,
+          staffId: e1.id,
           month,
           monthlySalary: e1.monthlySalary,
           present: 18,
@@ -389,7 +405,7 @@ export async function seedSampleIfEmpty(db: Database): Promise<void> {
           advance: 300000,
         },
         {
-          employeeId: e2.id,
+          staffId: e2.id,
           month,
           monthlySalary: e2.monthlySalary,
           present: 19,
@@ -411,9 +427,8 @@ export async function resetSample(db: Database): Promise<void> {
       challans,
       trips,
       salaryMonths,
-      employees,
       vendors,
-      drivers,
+      staff,
       trucks,
       auditLog,
       backups,
@@ -423,4 +438,44 @@ export async function resetSample(db: Database): Promise<void> {
     await tx.update(settings).set({ nextChallanNo: 1 });
   });
   await seedSampleIfEmpty(db);
+}
+
+/**
+ * Local demo / E2E only (`SEED_DEMO=1`, never the practice desk or the live desk): one login per
+ * role, all with the same password, linked to the sample staff so the driver sees only their trip.
+ * admin · neha (office) · ramesh (driver) · kishan (helper).
+ */
+export async function seedDemoLogins(db: Database, password: string): Promise<void> {
+  const [existing] = await db.select({ id: users.id }).from(users).limit(1);
+  if (existing) return;
+  const { hashPassword } = await import("@/lib/password");
+  const passwordHash = await hashPassword(password);
+  const [people, roleRows] = await Promise.all([
+    db.select({ id: staff.id, name: staff.name }).from(staff),
+    db.select({ id: roles.id, key: roles.key }).from(roles),
+  ]);
+  const staffId = (name: string) => people.find((p) => p.name === name)?.id ?? null;
+  const roleId = (key: string) => roleRows.find((r) => r.key === key)?.id;
+  const logins = [
+    { login: "admin", name: "Admin", role: "admin", staffId: null },
+    { login: "neha", name: "Neha Desai", role: "office", staffId: staffId("Neha Desai") },
+    { login: "ramesh", name: "Ramesh Yadav", role: "driver", staffId: staffId("Ramesh Yadav") },
+    { login: "kishan", name: "Kishan Rathod", role: "helper", staffId: staffId("Kishan Rathod") },
+  ] as const;
+  await db.transaction(async (tx) => {
+    for (const l of logins) {
+      const [user] = await tx
+        .insert(users)
+        .values({
+          login: l.login,
+          name: l.name,
+          staffId: l.staffId,
+          passwordHash,
+          mustChangePassword: false,
+        })
+        .returning({ id: users.id });
+      const role = roleId(l.role);
+      if (user && role) await tx.insert(userRoles).values({ userId: user.id, roleId: role });
+    }
+  });
 }

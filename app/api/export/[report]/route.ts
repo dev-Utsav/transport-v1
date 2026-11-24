@@ -8,6 +8,7 @@ import { cashBook, gstSummary, tripProfit } from "@/server/queries/reports";
 import { salaryRegister } from "@/server/queries/salary";
 import { listVendorBalances, vendorLedger } from "@/server/queries/vendors";
 import { getSettings } from "@/server/settings";
+import { apiDenied } from "@/server/auth";
 
 type Sheet = { name: string; header: string[]; rows: (string | number)[][] };
 
@@ -16,6 +17,8 @@ type Sheet = { name: string; header: string[]; rows: (string | number)[][] };
  * Amounts are plain rupees (1,23,456.50 → "123456.50") so Excel can sum them.
  */
 export async function GET(request: Request, { params }: { params: Promise<{ report: string }> }) {
+  const denied = await apiDenied("reports.export");
+  if (denied) return denied;
   const { report } = await params;
   const url = new URL(request.url);
   const month = isMonth(url.searchParams.get("month") ?? "")

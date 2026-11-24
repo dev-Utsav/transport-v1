@@ -1,6 +1,6 @@
 # Transport Desk: rules for Claude
 
-Phase 1 of the Transport Management System for a single-office transport business in Kadodara (one admin, phone first, Hindi + English). Built by Kreative Knot. The client's feature document is `docs/Transport Management System Feature Document.docx`.
+Phase 1 of the Transport Management System for a single-office transport business in Kadodara (a login per person with roles admin / office / driver / helper, phone first, Hindi + English). Built by Kreative Knot. The client's feature document is `docs/Transport Management System Feature Document.docx`.
 
 **Read first when resuming:** `docs/PROGRESS.md` (state, decisions, open points with the client, next steps).
 
@@ -45,6 +45,7 @@ server/
   db/                schema, connection, local demo seed
   queries/           reads, one file per area
   actions/           "use server" mutations, one file per area
+server/auth.ts       getActor / requireAccess / assertCan / apiDenied / tripScope
 proxy.ts             the login guard (Next 16 name for middleware)
 tests/
   unit/              pure lib/ functions (Vitest project "unit")
@@ -67,7 +68,8 @@ tests/
 - **Server components by default.** `"use client"` only on the smallest interactive leaf (forms, NavLink, PrintButton, BillPhoto). Pass only the string groups a client form needs (`t.common`, `t.challans`), never the whole dictionary.
 - **Every page is dynamic on purpose** (`ƒ` in the build): it shows the admin's live data and their language cookie. Don't add `"use cache"` to data reads without a revalidation plan.
 - **Forms work without JS.** Plain `<form action={serverAction}>`, `useActionState` via `components/forms/useForm.ts`, `defaultValue` from the returned values so a refused save keeps what was typed. Show/hide by CSS `:has()` where possible (new party fields, "received by", GST rate). The New challan steps only switch on after hydration; without JS it is one long form.
-- **Writes:** every action calls `assertAdmin()`, validates with Zod, runs in a transaction, and writes `logChange()` inside that transaction. Then `refreshDesk()` and `redirect()`.
+- **Access:** every page starts with `requireAccess(permission…)`, every action with `assertCan(permission…)`, every API route with `apiDenied(permission…)` (`server/auth.ts`). A unit test fails if one is missing. Trip reads and trip actions also apply `tripScope(actor)` (a driver only sees and works their own trips). Hide controls the person can't use; the server still checks.
+- **Writes:** every action checks access as above, validates with Zod, runs in a transaction, and writes `logChange()` inside that transaction (it records who, from the signed cookie, no query). Then `refreshDesk()` and `redirect()`.
 - **Nothing is deleted.** Challans, payments and expenses are cancelled (stay visible, leave every total). Trucks, drivers, parties and staff are hidden. Amounts on a challan can't be edited; cancel and rebook so the ledger stays true.
 - Don't store derived values in state; don't sync state with effects. React Compiler is on: no hand-written `useMemo`/`useCallback`.
 
@@ -76,6 +78,9 @@ tests/
 - **Money is integer paise**, everywhere. Convert only in `lib/money.ts` (`parseRupees`, `formatMoney`). GST rates are basis points (5% = 500).
 - GST is split once at booking (`lib/gst.ts`) and stored (`taxable`, `gstAmount`, `total`), so a later rate change never rewrites old challans.
 - Challan numbers come from `settings.nextChallanNo`, incremented inside the booking transaction. The number can only move forward.
+- **Staff is one table** (`staff`): drivers, helpers, office. `on_payroll` decides salary (a hired truck's driver is staff off payroll). Job role (`staff.role`) and login roles (`roles`) are separate on purpose.
+- **Logins** (`users`, `roles`, `permissions`, `role_permissions`, `user_roles`) always live in the real database, also on the practice desk. Permission keys and default role grants are code (`lib/access.ts`), synced on start; existing roles are never overwritten (an admin's edits win), so a changed default needs an explicit update for live data.
+- **Migrations:** squashed to one `drizzle/0000_init.sql` before the first deploy. Once `pnpm db:migrate` has run against Supabase, never edit or squash again: only add new migrations.
 - Who owes a challan (`partyId`): the sender for Paid and Billed later, the receiver for To-Pay. Paid challans record their payment at booking.
 - "Today" and months are IST (`lib/dates.ts`), never UTC midnight.
 - Salary is frozen per month (`salary_months.monthly_salary`); the formula is `lib/salary.ts`, shared by the form's live preview and the server.
@@ -134,7 +139,9 @@ Semantic HTML, one `h1` per page, labels on every field, errors tied with `aria-
 
 ## 10. Security
 
-- One admin password (`APP_PASSWORD`), stateless signed session cookie (`lib/session.ts`), checked in `proxy.ts` **and** in every server action. Changing the password signs everyone out. Login is rate-limited.
+- **A login per person** (scrypt hashes, `lib/password.ts`). The session cookie (`lib/session.ts`, signed with `SESSION_SECRET`) carries user id + `session_version`. `proxy.ts` checks only the signature (no DB); pages, actions and routes load the user, their active roles and permissions in one query per request (`getActor`). Switching a user off, resetting or changing a password signs them out at once (version bump).
+- `APP_PASSWORD` is only the one-time **setup key**: while no login exists, the sign-in page asks for it to create the first admin; after that it does nothing.
+- Always at least one active admin; nobody switches off their own login; a driver login must link to a driver in Staff. Login is rate-limited (5/min per login name per IP, 30/min per IP).
 - Security headers + CSP in `next.config.ts`; `noindex` on everything. Uploads are sniffed by magic bytes (`lib/image.ts`), never trusted by extension or claimed type.
 - Secrets only in Vercel env vars; `.env*` ignored; `.env.example` lists names. The live tool refuses to start without `DATABASE_URL` (never falls back to a throwaway disk DB).
 - Nightly backup (`/api/cron/backup`, `CRON_SECRET`) keeps the last 30 gzip snapshots in the DB; Settings → Backup downloads one any time.
@@ -145,7 +152,7 @@ Semantic HTML, one `h1` per page, labels on every field, errors tied with `aria-
 - `pnpm test:e2e` (Playwright) before every deploy and after any screen change: builds, starts on :3300 with its own database in `.data/e2e` (wiped and seeded each run), installed Chrome, phone 390 + desktop 1440, English + Hindi. Report: `.data/e2e-report`.
 - **Test databases never touch real data:** integrated tests use in-memory PGlite (a snapshot of the real migrations, one copy per test, `setDatabasesForTest`, refused unless `NODE_ENV=test`); E2E uses `TD_DATA_DIR=.data/e2e` with `DATABASE_URL` blanked. Dev data in `.data/pglite` is never used by tests.
 - **Every bug fix gets a test that failed before the fix.** New actions get an integrated test (rows written, totals, audit entry, refused input); new screens go in `tests/end-to-end/screens.spec.ts`.
-- Seed data: build only what a test needs with `tests/fixtures/factories.ts`; E2E uses the sample data in `server/db/sample.ts`.
+- Seed data: build only what a test needs with `tests/fixtures/factories.ts` (integrated tests start signed in as an admin; `signInAs(db, role)` switches). E2E and local dev (`SEED_DEMO=1`) use `server/db/sample.ts` plus demo logins admin, neha (office), ramesh (driver), kishan (helper), all with the `APP_PASSWORD` in use.
 - Then still look at changed screens yourself in Chrome, and do a no-JS pass on any changed form.
 
 ## 12. Git

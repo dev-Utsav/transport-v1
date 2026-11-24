@@ -7,6 +7,7 @@ import { formatChallanNo } from "@/lib/challan-no";
 import { formatDay, istDay } from "@/lib/dates";
 import { formatMoney, paiseToInput } from "@/lib/money";
 import { PAY_MODES } from "@/lib/types";
+import { requireAccess } from "@/server/auth";
 import { getT } from "@/server/lang";
 import { openChallansFor } from "@/server/queries/challans";
 import { getVendorBalance, vendorOptions } from "@/server/queries/vendors";
@@ -19,6 +20,7 @@ export default async function NewPaymentPage({
 }: {
   searchParams: Promise<{ vendor?: string; challan?: string; mode?: string }>;
 }) {
+  await requireAccess("payments.record");
   const { vendor, challan, mode } = await searchParams;
   const vendorId = Number(vendor) || 0;
   const [t, settings, parties, open, balance] = await Promise.all([

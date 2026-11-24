@@ -5,6 +5,7 @@ import { PageHead } from "@/components/ui/PageHead";
 import { PrintButton } from "@/components/ui/PrintButton";
 import { formatDay, formatMonth, istMonth, isMonth } from "@/lib/dates";
 import { formatAmount } from "@/lib/money";
+import { requireAccess } from "@/server/auth";
 import { getT } from "@/server/lang";
 import { salaryRegister } from "@/server/queries/salary";
 import { getSettings } from "@/server/settings";
@@ -16,6 +17,7 @@ export default async function SalaryRegisterPage({
 }: {
   searchParams: Promise<{ month?: string }>;
 }) {
+  await requireAccess("salary.view");
   const { month: m = "" } = await searchParams;
   const month = isMonth(m) ? m : istMonth();
   const [t, settings, rows] = await Promise.all([getT(), getSettings(), salaryRegister(month)]);

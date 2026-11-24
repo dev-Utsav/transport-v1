@@ -10,6 +10,7 @@ import { Pill } from "@/components/ui/Pill";
 import { Facts } from "@/components/ui/Rows";
 import { categoryLabel } from "@/content/strings";
 import { formatDayFull } from "@/lib/dates";
+import { requireAccess } from "@/server/auth";
 import { cancelExpense } from "@/server/actions/money";
 import { getT } from "@/server/lang";
 import { historyOf } from "@/server/queries/audit";
@@ -19,6 +20,7 @@ import { getTrip, truckOptions } from "@/server/queries/trips";
 export const metadata: Metadata = { title: "Expense" };
 
 export default async function ExpensePage({ params }: { params: Promise<{ id: string }> }) {
+  await requireAccess("expenses.view");
   const id = Number((await params).id);
   const [t, expense, history, trucks] = await Promise.all([
     getT(),

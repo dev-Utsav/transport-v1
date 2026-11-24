@@ -9,6 +9,7 @@ import { Stats } from "@/components/ui/Stats";
 import { categoryLabel } from "@/content/strings";
 import { formatDayFull, istDay, isDay, shiftDay } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
+import { requireAccess } from "@/server/auth";
 import { getT } from "@/server/lang";
 import { cashBook } from "@/server/queries/reports";
 
@@ -19,6 +20,7 @@ export default async function CashBookPage({
 }: {
   searchParams: Promise<{ day?: string }>;
 }) {
+  await requireAccess("reports.view");
   const { day: d = "" } = await searchParams;
   const today = istDay();
   const day = isDay(d) && d <= today ? d : today;

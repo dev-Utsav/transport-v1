@@ -5,29 +5,29 @@ import { and, asc, desc, eq, lte, or, sql } from "drizzle-orm";
 import { monthRange } from "@/lib/dates";
 import { calcSalary } from "@/lib/salary";
 import { getDb } from "@/server/db";
-import { employees, salaryMonths } from "@/server/db/schema";
+import { salaryMonths, staff } from "@/server/db/schema";
 
 /**
- * Everyone who worked that month (joined by its last day; hidden staff only if they have an
- * entry), with the month's entry if one exists and the computed pay.
+ * Everyone on payroll that month (joined by its last day; hidden or off-payroll staff only if
+ * they have an entry), with the month's entry if one exists and the computed pay.
  */
 export async function salaryRegister(month: string) {
   const db = await getDb();
   const { to } = monthRange(month);
   const rows = await db
-    .select({ employee: employees, entry: salaryMonths })
-    .from(employees)
-    .leftJoin(
-      salaryMonths,
-      and(eq(salaryMonths.employeeId, employees.id), eq(salaryMonths.month, month)),
-    )
+    .select({ employee: staff, entry: salaryMonths })
+    .from(staff)
+    .leftJoin(salaryMonths, and(eq(salaryMonths.staffId, staff.id), eq(salaryMonths.month, month)))
     .where(
       and(
-        lte(employees.joinedOn, to),
-        or(eq(employees.isActive, true), sql`${salaryMonths.id} is not null`),
+        lte(staff.joinedOn, to),
+        or(
+          and(eq(staff.onPayroll, true), eq(staff.isActive, true)),
+          sql`${salaryMonths.id} is not null`,
+        ),
       ),
     )
-    .orderBy(desc(employees.isActive), asc(employees.name));
+    .orderBy(desc(staff.isActive), asc(staff.name));
   return rows.map(({ employee, entry }) => {
     const pay = entry ? calcSalary({ ...entry, month }) : null;
     return { employee, entry, pay };
@@ -36,15 +36,25 @@ export async function salaryRegister(month: string) {
 
 export async function getEmployee(id: number) {
   const db = await getDb();
-  const [row] = await db.select().from(employees).where(eq(employees.id, id));
+  const [row] = await db.select().from(staff).where(eq(staff.id, id));
   return row ?? null;
 }
 
-export async function getSalaryEntry(employeeId: number, month: string) {
+/** Active drivers not on salary yet (added in Settings → Drivers), to put on payroll. */
+export async function driversOffPayroll() {
+  const db = await getDb();
+  return db
+    .select({ id: staff.id, name: staff.name, phone: staff.phone })
+    .from(staff)
+    .where(and(eq(staff.role, "driver"), eq(staff.onPayroll, false), eq(staff.isActive, true)))
+    .orderBy(asc(staff.name));
+}
+
+export async function getSalaryEntry(staffId: number, month: string) {
   const db = await getDb();
   const [row] = await db
     .select()
     .from(salaryMonths)
-    .where(and(eq(salaryMonths.employeeId, employeeId), eq(salaryMonths.month, month)));
+    .where(and(eq(salaryMonths.staffId, staffId), eq(salaryMonths.month, month)));
   return row ?? null;
 }

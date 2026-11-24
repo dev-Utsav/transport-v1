@@ -2,11 +2,13 @@ import type { Metadata } from "next";
 
 import { VendorForm } from "@/components/forms/VendorForm";
 import { PageHead } from "@/components/ui/PageHead";
+import { requireAccess } from "@/server/auth";
 import { getT } from "@/server/lang";
 
 export const metadata: Metadata = { title: "New party" };
 
 export default async function NewVendorPage() {
+  await requireAccess("parties.manage");
   const t = await getT();
   return (
     <>

@@ -9,6 +9,7 @@ import { Pill } from "@/components/ui/Pill";
 import { Empty, RowList, RowLink } from "@/components/ui/Rows";
 import { categoryLabel } from "@/content/strings";
 import { formatDay, formatMonth, istMonth, isMonth, shiftMonth } from "@/lib/dates";
+import { requireAccess } from "@/server/auth";
 import { getT } from "@/server/lang";
 import { expenseBreakdown, listExpenses } from "@/server/queries/money";
 
@@ -19,6 +20,7 @@ export default async function ExpensesPage({
 }: {
   searchParams: Promise<{ month?: string; saved?: string }>;
 }) {
+  await requireAccess("expenses.view");
   const { month: m = "", saved } = await searchParams;
   const thisMonth = istMonth();
   const month = isMonth(m) ? m : thisMonth;

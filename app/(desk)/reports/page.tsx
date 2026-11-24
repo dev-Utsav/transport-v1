@@ -2,11 +2,13 @@ import type { Metadata } from "next";
 
 import { PageHead } from "@/components/ui/PageHead";
 import { RowList, RowLink } from "@/components/ui/Rows";
+import { requireAccess } from "@/server/auth";
 import { getT } from "@/server/lang";
 
 export const metadata: Metadata = { title: "Reports" };
 
 export default async function ReportsPage() {
+  await requireAccess("reports.view");
   const t = await getT();
   const reports = [
     { href: "/reports/cash-book", title: t.reports.cashBook, help: t.reports.cashBookHelp },

@@ -17,6 +17,7 @@ import { formatDay } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
 import { PAY_MODES } from "@/lib/types";
 import { waLink } from "@/lib/whatsapp";
+import { requireAccess } from "@/server/auth";
 import { getT } from "@/server/lang";
 import { getPayment } from "@/server/queries/money";
 import { historyOf } from "@/server/queries/audit";
@@ -32,6 +33,7 @@ export default async function VendorPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ saved?: string; payment?: string }>;
 }) {
+  await requireAccess("parties.view");
   const id = Number((await params).id);
   const [{ saved, payment: paymentParam }, t, settings, balance, history] = await Promise.all([
     searchParams,

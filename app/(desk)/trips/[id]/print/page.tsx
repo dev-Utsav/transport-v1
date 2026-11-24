@@ -8,6 +8,7 @@ import { formatChallanNo } from "@/lib/challan-no";
 import { formatDayFull } from "@/lib/dates";
 import { formatAmount, formatMoney } from "@/lib/money";
 import { getT } from "@/server/lang";
+import { requireAccess, tripScope } from "@/server/auth";
 import { getTripDetail } from "@/server/queries/trips";
 import { getSettings } from "@/server/settings";
 
@@ -16,7 +17,12 @@ export const metadata: Metadata = { title: "Loading memo" };
 /** Loading memo for the driver: every challan on the truck, packages, and To-Pay money to collect. */
 export default async function TripMemoPage({ params }: { params: Promise<{ id: string }> }) {
   const id = Number((await params).id);
-  const [t, settings, detail] = await Promise.all([getT(), getSettings(), getTripDetail(id)]);
+  const actor = await requireAccess("trips.view");
+  const [t, settings, detail] = await Promise.all([
+    getT(),
+    getSettings(),
+    getTripDetail(id, tripScope(actor)),
+  ]);
   if (!detail) notFound();
   const { trip, groups, totals } = detail;
   const rows = groups.flatMap((g) => g.challans).sort((a, b) => a.no - b.no);

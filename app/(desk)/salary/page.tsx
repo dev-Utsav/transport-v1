@@ -8,6 +8,7 @@ import { PeriodNav } from "@/components/ui/PeriodNav";
 import { Pill } from "@/components/ui/Pill";
 import { Empty, RowList, RowLink } from "@/components/ui/Rows";
 import { formatMonth, istMonth, isMonth, shiftMonth } from "@/lib/dates";
+import { requireAccess } from "@/server/auth";
 import { getT } from "@/server/lang";
 import { salaryRegister } from "@/server/queries/salary";
 
@@ -18,6 +19,7 @@ export default async function SalaryPage({
 }: {
   searchParams: Promise<{ month?: string; saved?: string }>;
 }) {
+  await requireAccess("salary.view");
   const { month: m = "", saved } = await searchParams;
   const thisMonth = istMonth();
   const month = isMonth(m) ? m : thisMonth;

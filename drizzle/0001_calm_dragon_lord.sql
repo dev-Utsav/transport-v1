@@ -1,1 +1,0 @@
-ALTER TABLE "settings" ALTER COLUMN "expense_categories" SET DEFAULT ARRAY['diesel','toll','driver','repairs','tyres','loading','office','hire','other'];

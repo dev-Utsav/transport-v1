@@ -11,7 +11,8 @@ import { PAY_MODES } from "@/lib/types";
 import { logChange } from "@/server/audit";
 import { getDb } from "@/server/db";
 import { billPhotos, challans, expenses, payments } from "@/server/db/schema";
-import { assertAdmin, refreshDesk } from "@/server/guard";
+import { assertCan } from "@/server/auth";
+import { refreshDesk } from "@/server/guard";
 
 const MAX_PHOTO_BYTES = 1_500_000;
 
@@ -30,7 +31,7 @@ const paymentSchema = z.object({
 });
 
 export async function recordPayment(_prev: FormState, formData: FormData): Promise<FormState> {
-  await assertAdmin();
+  await assertCan("payments.record");
   const values = formValues(formData);
   const parsed = paymentSchema.safeParse(values);
   if (!parsed.success) return failed(parsed.error, values);
@@ -57,7 +58,7 @@ export async function recordPayment(_prev: FormState, formData: FormData): Promi
 }
 
 export async function cancelPayment(formData: FormData): Promise<void> {
-  await assertAdmin();
+  await assertCan("payments.cancel");
   const id = zf.id.parse(formData.get("id"));
   const db = await getDb();
   await db.transaction(async (tx) => {
@@ -80,7 +81,7 @@ const expenseSchema = z.object({
 });
 
 export async function addExpense(_prev: FormState, formData: FormData): Promise<FormState> {
-  await assertAdmin();
+  await assertCan("expenses.record");
   const values = formValues(formData);
   const parsed = expenseSchema.safeParse(values);
   if (!parsed.success) return failed(parsed.error, values);
@@ -109,7 +110,7 @@ export async function addExpense(_prev: FormState, formData: FormData): Promise<
 }
 
 export async function cancelExpense(formData: FormData): Promise<void> {
-  await assertAdmin();
+  await assertCan("expenses.cancel");
   const id = zf.id.parse(formData.get("id"));
   const db = await getDb();
   await db.transaction(async (tx) => {

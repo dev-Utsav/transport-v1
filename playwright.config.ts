@@ -52,6 +52,7 @@ export default defineConfig({
       SEED_DEMO: "1",
       APP_PASSWORD: E2E_PASSWORD,
       CRON_SECRET: "e2e-cron-secret-0000",
+      SESSION_SECRET: "e2e-session-secret-0000000000000000000000",
       DATABASE_URL: "",
     },
   },

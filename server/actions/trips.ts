@@ -11,7 +11,8 @@ import type { ChallanStatus, TripStatus } from "@/lib/types";
 import { logChange } from "@/server/audit";
 import { getDb } from "@/server/db";
 import { challans, trips } from "@/server/db/schema";
-import { assertAdmin, refreshDesk } from "@/server/guard";
+import { assertCan } from "@/server/auth";
+import { refreshDesk } from "@/server/guard";
 
 const tripSchema = z
   .object({
@@ -32,7 +33,7 @@ const tripSchema = z
   });
 
 export async function saveTrip(_prev: FormState, formData: FormData): Promise<FormState> {
-  await assertAdmin();
+  await assertCan("trips.manage");
   const values = formValues(formData);
   const parsed = tripSchema.safeParse(values);
   if (!parsed.success) return failed(parsed.error, values);
@@ -88,7 +89,7 @@ const CASCADE: Partial<Record<TripStatus, { to: ChallanStatus; from: ChallanStat
 };
 
 export async function setTripStatus(formData: FormData): Promise<void> {
-  await assertAdmin();
+  await assertCan("trips.manage");
   const { id, status } = z
     .object({ id: zf.id, status: z.enum(TRIP_STATUSES) })
     .parse({ id: formData.get("id"), status: formData.get("status") });

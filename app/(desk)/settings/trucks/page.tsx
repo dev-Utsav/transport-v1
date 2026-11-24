@@ -4,6 +4,7 @@ import { MasterRow } from "@/components/domain/MasterRow";
 import { TruckForm } from "@/components/forms/MasterForms";
 import { PageHead, Section } from "@/components/ui/PageHead";
 import { RowList } from "@/components/ui/Rows";
+import { requireAccess } from "@/server/auth";
 import { getT } from "@/server/lang";
 import { truckOptions } from "@/server/queries/trips";
 
@@ -14,6 +15,7 @@ export default async function TrucksPage({
 }: {
   searchParams: Promise<{ edit?: string }>;
 }) {
+  await requireAccess("masters.manage");
   const { edit } = await searchParams;
   const [t, trucks] = await Promise.all([getT(), truckOptions(true)]);
   const editing = trucks.find((tk) => String(tk.id) === edit);

@@ -8,6 +8,7 @@ import { PageHead } from "@/components/ui/PageHead";
 import { Empty, RowList } from "@/components/ui/Rows";
 import { fill } from "@/content/strings";
 import { formatDay, istDay, shiftDay } from "@/lib/dates";
+import { requireAccess } from "@/server/auth";
 import { getT } from "@/server/lang";
 import { overdueVendors } from "@/server/queries/vendors";
 import { getSettings } from "@/server/settings";
@@ -15,6 +16,7 @@ import { getSettings } from "@/server/settings";
 export const metadata: Metadata = { title: "Reminders" };
 
 export default async function RemindersPage() {
+  await requireAccess("parties.view");
   const [t, settings] = await Promise.all([getT(), getSettings()]);
   const rows = await overdueVendors(shiftDay(istDay(), -settings.reminderDays));
   return (

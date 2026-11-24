@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   customType,
   date,
   index,
@@ -17,10 +18,10 @@ import {
 
 import type {
   ChallanStatus,
-  EmployeeRole,
   GstMode,
   PayMode,
   PayType,
+  StaffRole,
   TripStatus,
   TruckOwner,
   VendorKind,
@@ -66,14 +67,34 @@ export const trucks = pgTable("trucks", {
   createdAt: createdAt(),
 });
 
-export const drivers = pgTable("drivers", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  phone: text("phone").notNull().default(""),
-  licence: text("licence").notNull().default(""),
-  isActive: boolean("is_active").notNull().default(true),
-  createdAt: createdAt(),
-});
+/**
+ * Everyone who works for the business: drivers, helpers, office. One record per person, so a
+ * salaried driver is picked on trips and paid salary from the same row. A hired truck's driver
+ * is staff with on_payroll = false (picked on trips, never paid salary here).
+ */
+export const staff = pgTable(
+  "staff",
+  {
+    id: serial("id").primaryKey(),
+    name: text("name").notNull(),
+    phone: text("phone").notNull().default(""),
+    // Job role (what they do). Login roles are separate: see `roles` / `user_roles`.
+    role: text("role").$type<StaffRole>().notNull(),
+    licence: text("licence").notNull().default(""),
+    onPayroll: boolean("on_payroll").notNull().default(false),
+    monthlySalary: integer("monthly_salary").notNull().default(0),
+    joinedOn: date("joined_on"),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("staff_role_idx").on(t.role),
+    check(
+      "staff_payroll_check",
+      sql`not ${t.onPayroll} or (${t.monthlySalary} > 0 and ${t.joinedOn} is not null)`,
+    ),
+  ],
+);
 
 export const trips = pgTable(
   "trips",
@@ -82,7 +103,7 @@ export const trips = pgTable(
     truckId: integer("truck_id")
       .notNull()
       .references(() => trucks.id),
-    driverId: integer("driver_id").references(() => drivers.id),
+    driverId: integer("driver_id").references(() => staff.id),
     fromPlace: text("from_place").notNull(),
     toPlace: text("to_place").notNull(),
     departOn: date("depart_on").notNull(),
@@ -91,7 +112,11 @@ export const trips = pgTable(
     note: text("note").notNull().default(""),
     createdAt: createdAt(),
   },
-  (t) => [index("trips_depart_idx").on(t.departOn), index("trips_truck_idx").on(t.truckId)],
+  (t) => [
+    index("trips_depart_idx").on(t.departOn),
+    index("trips_truck_idx").on(t.truckId),
+    index("trips_driver_idx").on(t.driverId),
+  ],
 );
 
 export const vendors = pgTable("vendors", {
@@ -197,24 +222,13 @@ export const billPhotos = pgTable("bill_photos", {
   data: bytea("data").notNull(),
 });
 
-export const employees = pgTable("employees", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  phone: text("phone").notNull().default(""),
-  role: text("role").$type<EmployeeRole>().notNull(),
-  monthlySalary: integer("monthly_salary").notNull(),
-  joinedOn: date("joined_on").notNull(),
-  isActive: boolean("is_active").notNull().default(true),
-  createdAt: createdAt(),
-});
-
 export const salaryMonths = pgTable(
   "salary_months",
   {
     id: serial("id").primaryKey(),
-    employeeId: integer("employee_id")
+    staffId: integer("staff_id")
       .notNull()
-      .references(() => employees.id),
+      .references(() => staff.id),
     month: text("month").notNull(),
     // Salary on file for that month, frozen so a later raise doesn't rewrite old slips.
     monthlySalary: integer("monthly_salary").notNull(),
@@ -228,7 +242,7 @@ export const salaryMonths = pgTable(
     paidMode: text("paid_mode").$type<PayMode>(),
     paidAmount: integer("paid_amount"),
   },
-  (t) => [uniqueIndex("salary_emp_month_idx").on(t.employeeId, t.month)],
+  (t) => [uniqueIndex("salary_staff_month_idx").on(t.staffId, t.month)],
 );
 
 /* ---------- Access: users, roles, permissions (RBAC) ----------
@@ -249,15 +263,16 @@ export const users = pgTable(
     // Set when the owner resets a password: the person must choose a new one on next sign-in.
     mustChangePassword: boolean("must_change_password").notNull().default(true),
     sessionVersion: integer("session_version").notNull().default(1),
-    // Optional link to the staff record (driver / office) this login belongs to.
-    employeeId: integer("employee_id").references(() => employees.id),
+    // The staff record this login belongs to. Required for the driver role (they see only
+    // trips where trips.driver_id = staff_id); empty for an admin who isn't staff.
+    staffId: integer("staff_id").references(() => staff.id),
     isActive: boolean("is_active").notNull().default(true),
     lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
     createdAt: createdAt(),
   },
   (t) => [
     uniqueIndex("users_login_idx").on(sql`lower(${t.login})`),
-    uniqueIndex("users_employee_idx").on(t.employeeId),
+    uniqueIndex("users_staff_idx").on(t.staffId),
   ],
 );
 

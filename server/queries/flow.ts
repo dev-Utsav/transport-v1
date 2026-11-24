@@ -3,7 +3,7 @@ import "server-only";
 import { aliasedTable, and, asc, eq, isNull, ne, sql } from "drizzle-orm";
 
 import { getDb } from "@/server/db";
-import { challans, drivers, trips, trucks, vendors } from "@/server/db/schema";
+import { challans, staff, trips, trucks, vendors } from "@/server/db/schema";
 import { countInt, sumInt } from "@/server/queries/sql";
 import { listVendorBalances } from "@/server/queries/vendors";
 
@@ -91,11 +91,19 @@ export async function loadingTrips() {
 /** What the "Getting started" checklist needs: has each master been set up? */
 export async function setupState() {
   const db = await getDb();
-  const one = (table: typeof trucks | typeof drivers | typeof vendors) =>
+  const one = (table: typeof trucks | typeof vendors) =>
     db
       .select({ n: sql<number>`1`.mapWith(Number) })
       .from(table)
       .limit(1);
-  const [t, d, v] = await Promise.all([one(trucks), one(drivers), one(vendors)]);
+  const [t, d, v] = await Promise.all([
+    one(trucks),
+    db
+      .select({ n: sql<number>`1`.mapWith(Number) })
+      .from(staff)
+      .where(eq(staff.role, "driver"))
+      .limit(1),
+    one(vendors),
+  ]);
   return { hasTruck: t.length > 0, hasDriver: d.length > 0, hasParty: v.length > 0 };
 }

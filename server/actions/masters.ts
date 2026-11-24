@@ -6,11 +6,12 @@ import { z } from "zod";
 
 import { failed, formValues, zf } from "@/lib/form";
 import type { FormState } from "@/lib/form";
-import { EMPLOYEE_ROLES, TRUCK_OWNERS } from "@/lib/types";
+import { STAFF_ROLES, TRUCK_OWNERS } from "@/lib/types";
 import { logChange } from "@/server/audit";
 import { getDb } from "@/server/db";
-import { drivers, employees, trucks } from "@/server/db/schema";
-import { assertAdmin, refreshDesk } from "@/server/guard";
+import { staff, trucks } from "@/server/db/schema";
+import { assertCan } from "@/server/auth";
+import { refreshDesk } from "@/server/guard";
 
 const truckSchema = z.object({
   id: zf.optionalId,
@@ -32,13 +33,13 @@ const employeeSchema = z.object({
   id: zf.optionalId,
   name: zf.text,
   phone: zf.phone,
-  role: z.enum(EMPLOYEE_ROLES),
+  role: z.enum(STAFF_ROLES),
   monthlySalary: zf.positiveMoney,
   joinedOn: zf.day,
 });
 
 export async function saveTruck(_prev: FormState, formData: FormData): Promise<FormState> {
-  await assertAdmin();
+  await assertCan("masters.manage");
   const values = formValues(formData);
   const parsed = truckSchema.safeParse(values);
   if (!parsed.success) return failed(parsed.error, values);
@@ -63,8 +64,9 @@ export async function saveTruck(_prev: FormState, formData: FormData): Promise<F
   redirect("/settings/trucks");
 }
 
+/** Settings → Drivers: a driver's name, phone and licence. New ones start off payroll. */
 export async function saveDriver(_prev: FormState, formData: FormData): Promise<FormState> {
-  await assertAdmin();
+  await assertCan("masters.manage");
   const values = formValues(formData);
   const parsed = driverSchema.safeParse(values);
   if (!parsed.success) return failed(parsed.error, values);
@@ -72,47 +74,55 @@ export async function saveDriver(_prev: FormState, formData: FormData): Promise<
   const db = await getDb();
   await db.transaction(async (tx) => {
     if (id) {
-      const [before] = await tx.select().from(drivers).where(eq(drivers.id, id));
-      const [after] = await tx.update(drivers).set(data).where(eq(drivers.id, id)).returning();
-      await logChange(tx, "driver", id, "update", before, after);
+      const [before] = await tx.select().from(staff).where(eq(staff.id, id));
+      const [after] = await tx.update(staff).set(data).where(eq(staff.id, id)).returning();
+      await logChange(tx, "staff", id, "update", before, after);
       return;
     }
-    const [created] = await tx.insert(drivers).values(data).returning();
-    if (created) await logChange(tx, "driver", created.id, "create", null, created);
+    const [created] = await tx
+      .insert(staff)
+      .values({ ...data, role: "driver", onPayroll: false })
+      .returning();
+    if (created) await logChange(tx, "staff", created.id, "create", null, created);
   });
   refreshDesk();
   redirect("/settings/drivers");
 }
 
+/** Salary → staff: anyone on salary. Saving puts them on payroll (also a driver added earlier). */
 export async function saveEmployee(_prev: FormState, formData: FormData): Promise<FormState> {
-  await assertAdmin();
+  await assertCan("salary.manage");
   const values = formValues(formData);
   const parsed = employeeSchema.safeParse(values);
   if (!parsed.success) return failed(parsed.error, values);
-  const { id, ...data } = parsed.data;
+  const { id, ...fields } = parsed.data;
+  const data = { ...fields, onPayroll: true };
   const db = await getDb();
-  await db.transaction(async (tx) => {
+  const staffId = await db.transaction(async (tx) => {
     if (id) {
-      const [before] = await tx.select().from(employees).where(eq(employees.id, id));
-      const [after] = await tx.update(employees).set(data).where(eq(employees.id, id)).returning();
-      await logChange(tx, "employee", id, "update", before, after);
-      return;
+      const [before] = await tx.select().from(staff).where(eq(staff.id, id));
+      const [after] = await tx.update(staff).set(data).where(eq(staff.id, id)).returning();
+      await logChange(tx, "staff", id, "update", before, after);
+      return id;
     }
-    const [created] = await tx.insert(employees).values(data).returning();
-    if (created) await logChange(tx, "employee", created.id, "create", null, created);
+    const [created] = await tx.insert(staff).values(data).returning();
+    if (!created) throw new Error("Insert failed");
+    await logChange(tx, "staff", created.id, "create", null, created);
+    return created.id;
   });
   refreshDesk();
-  redirect("/salary");
+  redirect(id ? `/salary/${staffId}` : "/salary");
 }
 
-const toggleTables = { truck: trucks, driver: drivers, employee: employees } as const;
+const toggleTables = { truck: trucks, driver: staff, employee: staff } as const;
 
-/** Hide or show a truck, driver or staff member. Nothing is deleted. */
+/** Hide or show a truck or a staff member (driver / employee screens). Nothing is deleted. */
 export async function toggleMaster(formData: FormData): Promise<void> {
-  await assertAdmin();
   const { kind, id } = z
     .object({ kind: z.enum(["truck", "driver", "employee"]), id: zf.id })
     .parse({ kind: formData.get("kind"), id: formData.get("id") });
+  // Staff on salary are hidden from the Salary screens; trucks and drivers from Settings.
+  await assertCan(kind === "employee" ? "salary.manage" : "masters.manage");
   const table = toggleTables[kind];
   const db = await getDb();
   await db.transaction(async (tx) => {
@@ -123,7 +133,7 @@ export async function toggleMaster(formData: FormData): Promise<void> {
       .set({ isActive: !before.isActive })
       .where(eq(table.id, id))
       .returning();
-    await logChange(tx, kind, id, "update", before, after);
+    await logChange(tx, kind === "truck" ? "truck" : "staff", id, "update", before, after);
   });
   refreshDesk();
 }

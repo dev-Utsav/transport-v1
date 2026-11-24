@@ -5,22 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1795177266741,
-      "tag": "0000_dear_iceman",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1795180365280,
-      "tag": "0001_calm_dragon_lord",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1795254701034,
-      "tag": "0002_access_rbac",
+      "when": 1795259106735,
+      "tag": "0000_init",
       "breakpoints": true
     }
   ]

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { VendorForm } from "@/components/forms/VendorForm";
 import { PageHead } from "@/components/ui/PageHead";
 import { paiseToInput } from "@/lib/money";
+import { requireAccess } from "@/server/auth";
 import { toggleVendor } from "@/server/actions/vendors";
 import { getT } from "@/server/lang";
 import { getVendor } from "@/server/queries/vendors";
@@ -11,6 +12,7 @@ import { getVendor } from "@/server/queries/vendors";
 export const metadata: Metadata = { title: "Edit party" };
 
 export default async function EditVendorPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireAccess("parties.manage");
   const id = Number((await params).id);
   const [t, vendor] = await Promise.all([getT(), getVendor(id)]);
   if (!vendor) notFound();

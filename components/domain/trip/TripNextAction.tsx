@@ -9,6 +9,8 @@ import type { TripStatus } from "@/lib/types";
 import { advanceTrip } from "@/server/actions/flow";
 import { setTripStatus } from "@/server/actions/trips";
 
+import type { TripCan } from "@/components/domain/trip/trip-can";
+
 /**
  * The truck's road and its one next action as a big button. Mistakes can be corrected with
  * the full status row, tucked under "Correct the status".
@@ -17,8 +19,10 @@ export function TripNextAction({
   t,
   trip,
   undelivered,
+  can,
 }: {
   t: Strings;
+  can: Pick<TripCan, "advance" | "manage">;
   trip: {
     id: number;
     fromPlace: string;
@@ -56,6 +60,8 @@ export function TripNextAction({
           <p className="text-[17px] font-bold">{label.deliver.title} ↓</p>
           <p className="text-[14px] text-road-muted">{label.deliver.help}</p>
         </div>
+      ) : !can.advance ? (
+        <p className="text-[16px] font-semibold">{label[action].title}</p>
       ) : (
         <form action={advanceTrip} className="grid gap-2" data-no-print>
           <input type="hidden" name="id" value={trip.id} />
@@ -72,20 +78,22 @@ export function TripNextAction({
         </form>
       )}
 
-      <details className="text-[14px]" data-no-print>
-        <summary className="cursor-pointer text-road-muted">{t.tripFlow.correct}</summary>
-        <div className="mt-3">
-          <StatusStepper
-            id={trip.id}
-            statuses={TRIP_STATUSES}
-            current={trip.status}
-            labels={t.tripStatus}
-            legend={t.trips.moveTo}
-            action={setTripStatus}
-            dark
-          />
-        </div>
-      </details>
+      {can.manage ? (
+        <details className="text-[14px]" data-no-print>
+          <summary className="cursor-pointer text-road-muted">{t.tripFlow.correct}</summary>
+          <div className="mt-3">
+            <StatusStepper
+              id={trip.id}
+              statuses={TRIP_STATUSES}
+              current={trip.status}
+              labels={t.tripStatus}
+              legend={t.trips.moveTo}
+              action={setTripStatus}
+              dark
+            />
+          </div>
+        </details>
+      ) : null}
     </section>
   );
 }

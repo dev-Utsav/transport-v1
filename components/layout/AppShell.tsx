@@ -2,11 +2,12 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { LangSwitch } from "@/components/layout/LangSwitch";
-import { mainNav, tabNav } from "@/components/layout/nav";
+import { allowedNav, mainNav, tabNav } from "@/components/layout/nav";
 import { NavLink } from "@/components/layout/NavLink";
 import { TourHost } from "@/components/tour/TourHost";
 import { Icon } from "@/components/ui/Icon";
 import type { Lang, Strings } from "@/content/strings";
+import type { Permission } from "@/lib/access";
 import { leavePractice, resetPractice } from "@/server/actions/practice";
 import { logout } from "@/server/actions/session";
 
@@ -29,18 +30,23 @@ export function AppShell({
   t,
   lang,
   businessName,
-  hasLogin,
+  permissions,
   isPractice,
   children,
 }: {
   t: Strings;
   lang: Lang;
   businessName: string;
-  hasLogin: boolean;
+  permissions: ReadonlySet<Permission>;
   isPractice: boolean;
   children: ReactNode;
 }) {
   const tabs = tabNav(t);
+  const side = allowedNav(mainNav(t), permissions);
+  const left = allowedNav(tabs.left, permissions);
+  const right = allowedNav(tabs.right, permissions);
+  const canBook = permissions.has("challans.book");
+  const home = permissions.has("challans.view") ? "/" : "/trips";
   const title = businessName || t.app.name;
   return (
     <div className="min-h-dvh lg:grid lg:grid-cols-[264px_1fr]">
@@ -55,7 +61,7 @@ export function AppShell({
         data-chrome
         className="sticky top-0 hidden h-dvh flex-col gap-6 border-r border-rule bg-paper px-4 py-6 lg:flex"
       >
-        <Link href="/" className="flex items-center gap-3 rounded-field px-2">
+        <Link href={home} className="flex items-center gap-3 rounded-field px-2">
           <Mark />
           <span className="grid leading-tight">
             <span className="text-[16px] font-bold tracking-tight">{title}</span>
@@ -63,20 +69,18 @@ export function AppShell({
           </span>
         </Link>
         <nav aria-label={t.nav.home} className="grid gap-1">
-          {mainNav(t).map((item) => (
+          {side.map(({ need: _need, ...item }) => (
             <NavLink key={item.href} {...item} variant="side" />
           ))}
         </nav>
         <div className="mt-auto grid gap-3">
           <LangSwitch lang={lang} label={t.common.language} />
-          {hasLogin ? (
-            <form action={logout}>
-              <button className="flex min-h-11 w-full items-center gap-3 rounded-field px-3 text-[15px] font-semibold text-ink-2 hover:bg-paper-deep hover:text-ink">
-                <Icon name="logout" size={20} />
-                {t.nav.logout}
-              </button>
-            </form>
-          ) : null}
+          <form action={logout}>
+            <button className="flex min-h-11 w-full items-center gap-3 rounded-field px-3 text-[15px] font-semibold text-ink-2 hover:bg-paper-deep hover:text-ink">
+              <Icon name="logout" size={20} />
+              {t.nav.logout}
+            </button>
+          </form>
         </div>
       </aside>
 
@@ -86,7 +90,7 @@ export function AppShell({
           data-chrome
           className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-rule bg-paper/95 px-4 py-2.5 backdrop-blur lg:hidden"
         >
-          <Link href="/" className="flex min-w-0 items-center gap-2.5">
+          <Link href={home} className="flex min-w-0 items-center gap-2.5">
             <Mark />
             <span className="truncate text-[16px] font-bold tracking-tight">{title}</span>
           </Link>
@@ -110,22 +114,31 @@ export function AppShell({
           className="fixed inset-x-0 bottom-0 z-40 border-t border-rule bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
         >
           <div className="mx-auto flex max-w-lg items-stretch px-1">
-            {tabs.left.map((item) => (
+            {left.map(({ need: _need, ...item }) => (
               <NavLink key={item.href} {...item} variant="tab" />
             ))}
-            <div className="flex flex-1 items-center justify-center">
-              <Link
-                href="/new"
-                aria-label={t.nav.new}
-                className="-mt-5 flex size-15 items-center justify-center rounded-full bg-signal text-card shadow-lift ring-4 ring-paper transition-transform duration-150 active:scale-95"
-              >
-                <Icon name="plus" size={28} />
-              </Link>
-            </div>
-            {tabs.right.map((item) => (
+            {canBook ? (
+              <div className="flex flex-1 items-center justify-center">
+                <Link
+                  href="/new"
+                  aria-label={t.nav.new}
+                  className="-mt-5 flex size-15 items-center justify-center rounded-full bg-signal text-card shadow-lift ring-4 ring-paper transition-transform duration-150 active:scale-95"
+                >
+                  <Icon name="plus" size={28} />
+                </Link>
+              </div>
+            ) : null}
+            {right.map(({ need: _need, ...item }) => (
               <NavLink key={item.href} {...item} variant="tab" />
             ))}
-            <NavLink {...tabs.more} variant="tab" also={MORE_PATHS} />
+            <NavLink
+              href={tabs.more.href}
+              label={tabs.more.label}
+              icon={tabs.more.icon}
+              tour={tabs.more.tour}
+              variant="tab"
+              also={MORE_PATHS}
+            />
           </div>
         </nav>
       </div>

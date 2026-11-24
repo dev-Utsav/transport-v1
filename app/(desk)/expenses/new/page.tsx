@@ -5,6 +5,7 @@ import { PageHead } from "@/components/ui/PageHead";
 import { categoryLabel } from "@/content/strings";
 import { formatDay, istDay } from "@/lib/dates";
 import { expenseCategoryList } from "@/lib/types";
+import { requireAccess } from "@/server/auth";
 import { getT } from "@/server/lang";
 import { tripOptions, truckOptions } from "@/server/queries/trips";
 import { getSettings } from "@/server/settings";
@@ -16,6 +17,7 @@ export default async function NewExpensePage({
 }: {
   searchParams: Promise<{ trip?: string }>;
 }) {
+  await requireAccess("expenses.record");
   const { trip } = await searchParams;
   const [t, settings, trucks, trips] = await Promise.all([
     getT(),

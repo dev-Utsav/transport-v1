@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { TripForm } from "@/components/forms/TripForm";
 import { PageHead } from "@/components/ui/PageHead";
+import { requireAccess } from "@/server/auth";
 import { getT } from "@/server/lang";
 import { placeOptions } from "@/server/queries/challans";
 import { driverOptions, getTrip, truckOptions } from "@/server/queries/trips";
@@ -10,6 +11,7 @@ import { driverOptions, getTrip, truckOptions } from "@/server/queries/trips";
 export const metadata: Metadata = { title: "Edit trip" };
 
 export default async function EditTripPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireAccess("trips.manage");
   const id = Number((await params).id);
   const [t, trip, trucks, drivers, places] = await Promise.all([
     getT(),

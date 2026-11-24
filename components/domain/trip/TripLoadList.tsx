@@ -12,6 +12,8 @@ import type { TripStatus } from "@/lib/types";
 import { deliverChallan, unloadFromTrip } from "@/server/actions/flow";
 import type { getTripDetail } from "@/server/queries/trips";
 
+import type { TripCan } from "@/components/domain/trip/trip-can";
+
 type Detail = NonNullable<Awaited<ReturnType<typeof getTripDetail>>>;
 type Row = Detail["groups"][number]["challans"][number];
 
@@ -24,11 +26,16 @@ export function TripLoadList({
   t,
   detail,
   prefix,
+  can,
 }: {
   t: Strings;
   detail: Detail;
   prefix: string;
+  can: TripCan;
 }) {
+  // Without access to parties / challans the rows are plain text, not links to a closed door.
+  const PartyLink = can.openParties ? Link : "div";
+  const ChallanLink = can.openChallans ? Link : "div";
   const status = detail.trip.status;
   // The tour points at the first parcel still to deliver.
   const firstToDeliver = detail.groups
@@ -42,7 +49,7 @@ export function TripLoadList({
           className="overflow-hidden rounded-card bg-card shadow-card ring-1 ring-rule"
         >
           <header className="flex flex-wrap items-center gap-3 border-b border-rule bg-paper/60 px-4 py-3 sm:px-5">
-            <Link href={`/vendors/${g.partyId}`} className="min-w-0 flex-1">
+            <PartyLink href={`/vendors/${g.partyId}`} className="min-w-0 flex-1">
               <h3 className="truncate text-[17px] font-bold">{g.name}</h3>
               <p className="text-[14px] text-ink-2">
                 <span className="num">{g.packages}</span> {t.trips.packages} ·{" "}
@@ -54,7 +61,7 @@ export function TripLoadList({
                   </span>
                 ) : null}
               </p>
-            </Link>
+            </PartyLink>
             {g.due > 0 && g.phone && status !== "loading" ? (
               <RemindButton t={t} name={g.name} phone={g.phone} balance={g.due} compact />
             ) : null}
@@ -62,7 +69,7 @@ export function TripLoadList({
           <ul className="divide-y divide-rule">
             {g.challans.map((c) => (
               <li key={c.id} className="grid grid-cols-[minmax(0,1fr)] gap-3 px-4 py-3 sm:px-5">
-                <Link href={`/challans/${c.id}`} className="flex items-center gap-3">
+                <ChallanLink href={`/challans/${c.id}`} className="flex items-center gap-3">
                   <span className="w-20 shrink-0 font-mono text-[14px] font-medium">
                     {formatChallanNo(c.no, prefix)}
                   </span>
@@ -83,13 +90,14 @@ export function TripLoadList({
                       <Pill tone={COLLECT_TONE[c.state]}>{t.collect[c.state]}</Pill>
                     )}
                   </span>
-                </Link>
+                </ChallanLink>
                 <RowActions
                   t={t}
                   status={status}
                   row={c}
                   tripId={detail.trip.id}
                   isFirst={c.id === firstToDeliver}
+                  can={can}
                 />
               </li>
             ))}
@@ -106,14 +114,17 @@ function RowActions({
   row,
   tripId,
   isFirst,
+  can,
 }: {
   t: Strings;
   status: TripStatus;
   row: Row;
   tripId: number;
   isFirst: boolean;
+  can: TripCan;
 }) {
   if (status === "loading") {
+    if (!can.load) return null;
     return (
       <form action={unloadFromTrip} className="justify-self-end" data-no-print>
         <input type="hidden" name="id" value={row.id} />
@@ -123,7 +134,7 @@ function RowActions({
       </form>
     );
   }
-  if (status !== "arrived" || row.status === "delivered") return null;
+  if (status !== "arrived" || row.status === "delivered" || !can.deliver) return null;
   const back = `/trips/${tripId}`;
   if (row.due > 0 && row.payType === "to_pay") {
     return (

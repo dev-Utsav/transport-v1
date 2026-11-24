@@ -10,7 +10,8 @@ import { VENDOR_KINDS } from "@/lib/types";
 import { logChange } from "@/server/audit";
 import { getDb } from "@/server/db";
 import { vendors } from "@/server/db/schema";
-import { assertAdmin, refreshDesk } from "@/server/guard";
+import { assertCan } from "@/server/auth";
+import { refreshDesk } from "@/server/guard";
 
 const gstin = z
   .string()
@@ -35,7 +36,7 @@ const vendorSchema = z.object({
 });
 
 export async function saveVendor(_prev: FormState, formData: FormData): Promise<FormState> {
-  await assertAdmin();
+  await assertCan("parties.manage");
   const values = formValues(formData);
   const parsed = vendorSchema.safeParse(values);
   if (!parsed.success) return failed(parsed.error, values);
@@ -59,7 +60,7 @@ export async function saveVendor(_prev: FormState, formData: FormData): Promise<
 }
 
 export async function toggleVendor(formData: FormData): Promise<void> {
-  await assertAdmin();
+  await assertCan("parties.manage");
   const id = zf.id.parse(formData.get("id"));
   const db = await getDb();
   await db.transaction(async (tx) => {

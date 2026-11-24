@@ -2,6 +2,62 @@
 
 Newest entry at the top. Rules: `../CLAUDE.md`. Client brief: `Transport Management System Feature Document.docx` (this folder).
 
+## 2026-11-21 (evening): one staff table, logins per person with roles, migrations squashed
+
+Asked by the backend consultant (after the client asked for admin access): roles **admin / office / driver / helper**, **a driver sees only their own trips**, drivers and employees merged, no new migrations.
+
+### Database
+
+- **`staff` replaces `drivers` + `employees`.**
+  - One record per person, so a salaried driver is no longer entered twice.
+  - `on_payroll` with a CHECK constraint (on payroll needs a salary and a joining date); a hired truck's driver is staff off payroll.
+  - `trips.driver_id`, `salary_months.staff_id` and `users.staff_id` all point at it.
+  - Settings → Drivers adds drivers off payroll. Salary → Add staff lists them under "Put a driver on salary", which opens the same record (no duplicate).
+- **Migrations squashed** into one `drizzle/0000_init.sql` (nothing deployed yet). From the first `pnpm db:migrate` on Supabase onwards, only add migrations (written into CLAUDE.md §6).
+- Local dev data was recreated: the old copy is in `.data/_old-before-squash/`, which can be deleted.
+
+### Logins and roles (wired end to end)
+
+- **A login per person:** login name + password (scrypt).
+  - The cookie is signed with the new **`SESSION_SECRET`** and carries the user id + `session_version`.
+  - `proxy.ts` checks only the signature. Every page (`requireAccess`), action (`assertCan`) and API route (`apiDenied`) loads the user, their active roles and permissions in one query.
+  - A unit test fails if any page, route or action skips its check.
+- **First run:** while no login exists, the sign-in page shows "Set up the first admin" and asks for `APP_PASSWORD` as a one-time setup key.
+- **Settings → Users** (admin): add or edit a user (roles as checkboxes, link to a staff member), reset a password (forces a change, signs them out), switch a login off.
+  - Guards: always at least one active admin; nobody switches off themselves; a driver login must link to a driver in Staff.
+- **Change my password** (More / Settings). A first password must be changed before anything else.
+- **What each role can do** (`lib/access.ts`; open point 8 with the client):
+  - admin: everything;
+  - office: desk work, but no cancels, salaries, settings, backups, history or logins;
+  - driver: **only their own trips** (no `trips.all`; trips list, trip, loading memo and the trip actions are all scoped by `staff_id`), can mark left / arrived, deliver and collect;
+  - helper: every trip, load and unload.
+- **Screens follow permissions:** menus and tabs, Home's office links, Settings sections, and trip buttons (load, deliver, correct status, edit, trip money). A driver starts on Trips.
+- **The audit log records who** (`audit_log.actor_id`, from the signed cookie, so no extra query inside the transaction).
+- **Login rate limit:** 5 tries a minute per login name per IP, 30 per IP.
+- **Local demo** (`SEED_DEMO=1`): logins admin, neha (office), ramesh (driver), kishan (helper), with the `APP_PASSWORD` from `.env.local`.
+
+### Found and fixed on the way
+
+- `logChange` looked up the user inside the write transaction. On the embedded database (one connection) every write hung. It now reads the id from the verified cookie.
+- Existing roles keep their permissions when the code defaults change, by design (admin edits win). The dev database had the earlier driver default; it was recreated. **For live data, a changed default needs an explicit update** (or a roles editor; see Next).
+
+### Verified
+
+- `pnpm check`: 92 unit + integrated tests (staff rules, driver scoping, helper / office limits, setup key, sign-in, last-admin guard, password reset, audit actor), lint 0, build OK.
+- `pnpm test:e2e`: 147 passed. Every screen including the Users pages in English / Hindi at 390 / 1440, plus a spec per role (the driver sees 1 trip and gets 404 elsewhere; helper and office limits).
+- Signed in as each demo login on the dev server; the Users form checked at 390 px in Hindi.
+
+### Before deploying (new)
+
+- Add **`SESSION_SECRET`** (32+ random characters) to Vercel and to `.env.production` / `.env.production.local`. Production refuses to start without it.
+- `APP_PASSWORD` becomes the setup key: give it to the owner once, to create their admin login.
+
+### Next
+
+1. Client: confirm what each role may do (open point 8) and whether drivers may close a trip (currently yes, under "advance").
+2. A roles editor (which permissions each role has) if the client wants to change them themselves. Today that is code plus a data update.
+3. Commit (not done; waiting for the OK), then deploy.
+
 ## 2026-11-21 (later): local testing setup (unit, integrated, end-to-end)
 
 The backend consultant asked for tests with a separate test database and seed data, local only (no CI). Everything was committed first (`fc4bd2e`).
@@ -70,7 +126,7 @@ After the demo the client asked for admin access, which means separate logins. T
 ### Open points with the client
 
 8. **Roles decided (Utsav, 2026-11-21): admin, office, driver, helper** (`lib/access.ts`). Still open with the client: what each may do. Defaults: admin = everything; office = desk work, but no cancelling money records, salaries, settings, backups, history or logins; driver = see trips and parcels, left / arrived, deliver and collect; helper = see trips and parcels, load and unload. Trip permissions are split into `trips.manage` / `trips.load` / `trips.advance` / `trips.deliver` for this. Also open: should a driver see only their own trips? That would use `users.employee_id` → `trips.driver_id`.
-9. Do drivers get a login (e.g. to mark delivered)? `users.employee_id` allows it.
+9. Drivers get a login and see only their own trips (decided 2026-11-21).
 
 ## 2026-11-20 (later): one flow everywhere, practice desk, guided tour
 

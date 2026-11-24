@@ -34,8 +34,12 @@ function migratedTemplate(): Promise<File | Blob> {
 
 export type TestDb = { db: Database; practice: Database };
 
-/** Call at the top of a test file. Returns a getter for the current test's database. */
-export function setupTestDb(): () => TestDb {
+/**
+ * Call at the top of a test file. Returns a getter for the current test's database.
+ * Every test starts signed in as an admin (`signInAs` in factories switches role); pass
+ * `{ signedIn: false }` to start signed out.
+ */
+export function setupTestDb({ signedIn = true }: { signedIn?: boolean } = {}): () => TestDb {
   let current: (TestDb & { close: () => Promise<void> }) | undefined;
   beforeEach(async () => {
     const snapshot = await migratedTemplate();
@@ -44,6 +48,10 @@ export function setupTestDb(): () => TestDb {
     const db = drizzle({ client: realClient, schema });
     const practice = drizzle({ client: practiceClient, schema });
     setDatabasesForTest(db, practice);
+    if (signedIn) {
+      const { signInAs } = await import("@/tests/fixtures/factories");
+      await signInAs(db, "admin");
+    }
     current = {
       db,
       practice,

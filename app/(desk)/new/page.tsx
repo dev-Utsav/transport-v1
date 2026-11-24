@@ -4,12 +4,14 @@ import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
 import type { IconName } from "@/components/ui/Icon";
 import { PageHead } from "@/components/ui/PageHead";
+import { requireAccess } from "@/server/auth";
 import { getT } from "@/server/lang";
 
 export const metadata: Metadata = { title: "New" };
 
 /** The tab bar's + button: the four everyday entries, one tap each. */
 export default async function NewPage() {
+  await requireAccess("challans.book");
   const t = await getT();
   const items: { href: string; label: string; icon: IconName }[] = [
     { href: "/challans/new", label: t.home.newChallan, icon: "receipt" },

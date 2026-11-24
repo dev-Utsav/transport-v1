@@ -33,6 +33,10 @@ const SCREENS = [
   "/vendors/1",
   "/salary/1",
   "/salary/1/slip",
+  "/settings/users",
+  "/settings/users/new",
+  "/settings/users/1",
+  "/account/password",
 ];
 
 for (const lang of ["en", "hi"] as const) {

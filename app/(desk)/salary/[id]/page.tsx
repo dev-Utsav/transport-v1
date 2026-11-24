@@ -7,6 +7,7 @@ import { PageHead } from "@/components/ui/PageHead";
 import { Pill } from "@/components/ui/Pill";
 import { daysInMonth, formatDay, formatMonth, istDay, istMonth, isMonth } from "@/lib/dates";
 import { formatMoney, paiseToInput } from "@/lib/money";
+import { requireAccess } from "@/server/auth";
 import { getT } from "@/server/lang";
 import { getEmployee, getSalaryEntry } from "@/server/queries/salary";
 
@@ -19,6 +20,7 @@ export default async function SalaryEntryPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ month?: string }>;
 }) {
+  await requireAccess("salary.view");
   const id = Number((await params).id);
   const { month: m = "" } = await searchParams;
   const month = isMonth(m) ? m : istMonth();
@@ -67,7 +69,7 @@ export default async function SalaryEntryPage({
         month={month}
         isPaid={Boolean(entry?.paidOn)}
         initial={{
-          employeeId: String(id),
+          staffId: String(id),
           present: String(entry?.present ?? daysInMonth(month)),
           absent: String(entry?.absent ?? 0),
           halfDays: String(entry?.halfDays ?? 0),

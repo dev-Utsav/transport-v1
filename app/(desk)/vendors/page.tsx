@@ -7,6 +7,7 @@ import { ButtonLink } from "@/components/ui/Button";
 import { PageHead } from "@/components/ui/PageHead";
 import { Pill } from "@/components/ui/Pill";
 import { Empty, RowList, RowLink } from "@/components/ui/Rows";
+import { requireAccess } from "@/server/auth";
 import { getT } from "@/server/lang";
 import { listVendorBalances } from "@/server/queries/vendors";
 
@@ -17,6 +18,7 @@ export default async function VendorsPage({
 }: {
   searchParams: Promise<{ q?: string; due?: string }>;
 }) {
+  await requireAccess("parties.view");
   const { q = "", due } = await searchParams;
   const dueOnly = due === "1";
   const [t, rows] = await Promise.all([getT(), listVendorBalances({ q, dueOnly })]);

@@ -6,7 +6,7 @@ import { Choice } from "@/components/ui/Choice";
 import { Field, MoneyInput, TextInput } from "@/components/ui/Field";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import type { Strings } from "@/content/strings";
-import { EMPLOYEE_ROLES } from "@/lib/types";
+import { STAFF_ROLES } from "@/lib/types";
 import { saveEmployee } from "@/server/actions/masters";
 
 export function EmployeeForm({
@@ -28,8 +28,8 @@ export function EmployeeForm({
       <Choice
         name="role"
         legend={t.salary.role}
-        defaultValue={EMPLOYEE_ROLES.find((r) => r === v("role"))}
-        options={EMPLOYEE_ROLES.map((r) => ({ value: r, label: t.roles[r] }))}
+        defaultValue={STAFF_ROLES.find((r) => r === v("role"))}
+        options={STAFF_ROLES.map((r) => ({ value: r, label: t.roles[r] }))}
         error={e("role") ? c.required : undefined}
       />
       <Field id="monthlySalary" label={t.salary.monthly} error={e("monthlySalary")} c={c}>

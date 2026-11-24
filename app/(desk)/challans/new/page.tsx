@@ -5,6 +5,7 @@ import { ChallanForm } from "@/components/forms/ChallanForm";
 import { PageHead } from "@/components/ui/PageHead";
 import { formatDay, istDay } from "@/lib/dates";
 import { formatRate } from "@/lib/gst";
+import { requireAccess } from "@/server/auth";
 import { getT } from "@/server/lang";
 import { placeOptions } from "@/server/queries/challans";
 import { tripOptions } from "@/server/queries/trips";
@@ -18,6 +19,7 @@ export default async function NewChallanPage({
 }: {
   searchParams: Promise<{ trip?: string }>;
 }) {
+  await requireAccess("challans.book");
   const { trip } = await searchParams;
   const [t, settings, parties, trips, places] = await Promise.all([
     getT(),

@@ -55,7 +55,7 @@ export function SalaryForm({
   return (
     <form action={formAction} onInput={onInput} className="grid max-w-xl gap-5">
       <FormError show={hasErrors} message={c.fixErrors} />
-      <input type="hidden" name="employeeId" value={initial.employeeId} />
+      <input type="hidden" name="staffId" value={initial.staffId} />
       <input type="hidden" name="month" value={month} />
       <div className="grid grid-cols-3 gap-3">
         {NUMBER_FIELDS.map((name) => (

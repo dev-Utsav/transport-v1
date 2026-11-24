@@ -2,9 +2,12 @@ import { eq } from "drizzle-orm";
 
 import { getDb } from "@/server/db";
 import { billPhotos } from "@/server/db/schema";
+import { apiDenied } from "@/server/auth";
 
 /** Serves one bill photo. Behind the login (proxy), private, never cached by shared caches. */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const denied = await apiDenied("expenses.view");
+  if (denied) return denied;
   const id = Number((await params).id);
   if (!Number.isInteger(id) || id <= 0) return new Response("Not found", { status: 404 });
   const db = await getDb();

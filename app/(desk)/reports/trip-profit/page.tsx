@@ -8,6 +8,7 @@ import { PeriodNav } from "@/components/ui/PeriodNav";
 import { Empty } from "@/components/ui/Rows";
 import { formatDay, formatMonth, istMonth, isMonth, shiftMonth } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
+import { requireAccess } from "@/server/auth";
 import { getT } from "@/server/lang";
 import { tripProfit } from "@/server/queries/reports";
 
@@ -18,6 +19,7 @@ export default async function TripProfitPage({
 }: {
   searchParams: Promise<{ month?: string }>;
 }) {
+  await requireAccess("reports.view");
   const { month: m = "" } = await searchParams;
   const thisMonth = istMonth();
   const month = isMonth(m) ? m : thisMonth;

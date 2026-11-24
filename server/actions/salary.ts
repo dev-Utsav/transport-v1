@@ -11,12 +11,13 @@ import { calcSalary } from "@/lib/salary";
 import { PAY_MODES } from "@/lib/types";
 import { logChange } from "@/server/audit";
 import { getDb } from "@/server/db";
-import { employees, salaryMonths } from "@/server/db/schema";
-import { assertAdmin, refreshDesk } from "@/server/guard";
+import { salaryMonths, staff } from "@/server/db/schema";
+import { assertCan } from "@/server/auth";
+import { refreshDesk } from "@/server/guard";
 
 const entrySchema = z
   .object({
-    employeeId: zf.id,
+    staffId: zf.id,
     month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
     present: zf.count,
     absent: zf.count,
@@ -40,21 +41,19 @@ const entrySchema = z
 
 /** Saves attendance, advances and deductions; optionally marks the net as paid in the same step. */
 export async function saveSalaryEntry(_prev: FormState, formData: FormData): Promise<FormState> {
-  await assertAdmin();
+  await assertCan("salary.manage");
   const values = formValues(formData);
   const parsed = entrySchema.safeParse(values);
   if (!parsed.success) return failed(parsed.error, values);
   const { markPaid, paidMode, paidOn, ...entry } = parsed.data;
   const db = await getDb();
   await db.transaction(async (tx) => {
-    const [employee] = await tx.select().from(employees).where(eq(employees.id, entry.employeeId));
+    const [employee] = await tx.select().from(staff).where(eq(staff.id, entry.staffId));
     if (!employee) throw new Error("Employee not found");
     const [before] = await tx
       .select()
       .from(salaryMonths)
-      .where(
-        and(eq(salaryMonths.employeeId, entry.employeeId), eq(salaryMonths.month, entry.month)),
-      );
+      .where(and(eq(salaryMonths.staffId, entry.staffId), eq(salaryMonths.month, entry.month)));
     // Salary is frozen per month: an existing entry keeps the rate it was made with.
     const monthlySalary = before?.monthlySalary ?? employee.monthlySalary;
     const net = calcSalary({ ...entry, monthlySalary }).net;

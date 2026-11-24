@@ -11,11 +11,12 @@ import { PAY_MODES } from "@/lib/types";
 import { logChange } from "@/server/audit";
 import { getDb } from "@/server/db";
 import { challans, payments, trips } from "@/server/db/schema";
-import { assertAdmin, refreshDesk } from "@/server/guard";
+import { assertCan, tripScope } from "@/server/auth";
+import { refreshDesk } from "@/server/guard";
 
 /** Puts waiting parcels (booked, on no truck) on a truck that is still loading. */
 export async function loadOnTrip(formData: FormData): Promise<void> {
-  await assertAdmin();
+  await assertCan("trips.load");
   const tripId = zf.id.parse(formData.get("tripId"));
   const ids = z.array(z.coerce.number().int().positive()).max(500).parse(formData.getAll("ids"));
   const db = await getDb();
@@ -55,7 +56,7 @@ export async function loadOnTrip(formData: FormData): Promise<void> {
 
 /** Takes a parcel back off a truck that hasn't left yet. */
 export async function unloadFromTrip(formData: FormData): Promise<void> {
-  await assertAdmin();
+  await assertCan("trips.load");
   const id = zf.id.parse(formData.get("id"));
   const db = await getDb();
   let tripId: number | null = null;
@@ -86,18 +87,26 @@ export async function unloadFromTrip(formData: FormData): Promise<void> {
  * Only moves forward from the expected status, so a double tap does nothing.
  */
 export async function advanceTrip(formData: FormData): Promise<void> {
-  await assertAdmin();
+  const actor = await assertCan("trips.advance");
   const { id, action } = z
     .object({ id: zf.id, action: z.enum(["dispatch", "arrive", "close"]) })
     .parse({ id: formData.get("id"), action: formData.get("action") });
   const from = { dispatch: "loading", arrive: "in_transit", close: "arrived" } as const;
   const to = TRIP_ACTION_TO[action];
+  const scope = tripScope(actor);
   const db = await getDb();
   await db.transaction(async (tx) => {
     const moved = await tx
       .update(trips)
       .set({ status: to })
-      .where(and(eq(trips.id, id), eq(trips.status, from[action])))
+      .where(
+        and(
+          eq(trips.id, id),
+          eq(trips.status, from[action]),
+          // A driver moves only their own truck.
+          scope === null ? undefined : eq(trips.driverId, scope),
+        ),
+      )
       .returning({ id: trips.id });
     if (!moved.length) return;
     await logChange(tx, "trip", id, "update", { status: from[action] }, { status: to });
@@ -123,7 +132,8 @@ export async function advanceTrip(formData: FormData): Promise<void> {
  * from the party who owes it (To-Pay is collected on delivery).
  */
 export async function deliverChallan(formData: FormData): Promise<void> {
-  await assertAdmin();
+  const actor = await assertCan("trips.deliver");
+  const scope = tripScope(actor);
   const { id, mode, back } = z
     .object({
       id: zf.id,
@@ -143,6 +153,13 @@ export async function deliverChallan(formData: FormData): Promise<void> {
   await db.transaction(async (tx) => {
     const [c] = await tx.select().from(challans).where(eq(challans.id, id));
     if (!c || c.isCancelled) return;
+    if (scope !== null) {
+      // A driver delivers only parcels on their own trip.
+      const [trip] = c.tripId
+        ? await tx.select({ driverId: trips.driverId }).from(trips).where(eq(trips.id, c.tripId))
+        : [];
+      if (trip?.driverId !== scope) throw new Error("Not allowed");
+    }
     if (c.status !== "delivered") {
       await tx.update(challans).set({ status: "delivered" }).where(eq(challans.id, id));
       await logChange(tx, "challan", id, "update", { status: c.status }, { status: "delivered" });
