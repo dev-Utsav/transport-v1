@@ -62,7 +62,7 @@ apps/
         challans/ trips/ parties/ money/ salary/ reports/ settings/
         users/ sessions/ orgs/ audit/ files/ backups/
       plugins/         auth, tenant context, errors, rate limit, request log
-      jobs/            pg-boss workers (backups, reminders, cleanup)
+      jobs/            pg-boss queue: workers + schedules (exports, backups, reminders, cleanup)
       server.ts
 packages/
   config/              shared tsconfig bases, ESLint, Prettier, Vitest presets, env loading (zod)
@@ -445,16 +445,59 @@ REST over JSON. Fastify's zod type provider uses the schemas from `packages/cont
 - the API records the key;
 - a one-time job moves the existing `bytea` photos.
 
-### 8.3 Background jobs
+### 8.3 Background jobs (pg-boss queue)
 
-**pg-boss** runs in the API process and uses the same Postgres, so no new infrastructure is needed. Jobs:
+**Decision: heavy, slow and scheduled work runs on a pg-boss queue, never inside a request.**
 
-- per-org nightly backup export to object storage, replacing the in-database `backups` table (phase-1 open point 12);
-- To-Pay and udhaar overdue reminders, using `reminderDays`, shown in the app and later sent by WhatsApp;
-- cleanup: expired sessions, used or expired invites, old idempotency keys;
-- large report and CSV exports, emailed or downloaded when ready.
+- pg-boss keeps its queue in the same Postgres (its own `pgboss` schema), so there is no Redis or extra service to run, back up or secure.
+- Postgres `SKIP LOCKED` lets several workers take jobs without taking the same one twice.
 
-Vercel cron goes away; the job schedule lives in the API.
+**What goes on the queue.** A request does the minimum that the person must see succeed, records the job, and answers at once. Anything that matches one of these goes on the queue:
+
+| Rule                                                          | Examples                                                                                                                |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| takes more than about 2 s, or grows with the size of the data | large report and CSV exports, the GST period summary, a full backup                                                     |
+| calls an outside service that can be slow or down             | WhatsApp or SMS messages, email, object-storage copies                                                                  |
+| must retry if it fails                                        | sending a reminder, uploading a backup                                                                                  |
+| runs on a schedule                                            | nightly backups, daily overdue reminders, monthly salary month set-up                                                   |
+| fans out to many organisations                                | "for every org: back up / remind / clean up"                                                                            |
+| housekeeping                                                  | delete expired sessions, invites and idempotency keys; move the existing `bytea` photos (§8.2); remove old export files |
+
+**What stays in the request:** booking a challan, recording a payment, every step of the five-step flow. These are fast, and the person must know at once that they saved.
+
+**How jobs are built**
+
+- **Enqueue in the same transaction as the business write.** pg-boss can send through the caller's database connection. If the booking rolls back, its job disappears with it, and a job never exists for a row that was never saved. Check the exact option in the pinned version.
+- **The payload holds only ids and the org:** `{ orgId, exportId, requestedBy }`, never whole records or personal data. The worker reads fresh data itself.
+- **Workers run in the tenant context:** each handler starts with `withTenant(orgId, …)` (§4), so RLS applies to background work exactly as it does to requests.
+- **Every handler is idempotent.** pg-boss delivers at least once, so a job can run twice after a crash. Handlers check "already done?" first: an export with a file, a reminder already sent today.
+- **Retries:** a retry limit with exponential backoff for each queue, plus a timeout (`expireIn`) so a stuck job is retried instead of blocking the queue.
+- **Failed jobs go to a dead-letter queue.** They are kept, shown on the platform console with their error `ref`, and can be retried by hand.
+- **No duplicates:** singleton or debounce keys stop a job being queued twice, e.g. one export per org, report and date range at a time.
+- **Fairness between orgs:** per-queue concurrency limits, plus a per-org limit for heavy queues, so one org exporting a year of data can't hold up everyone's backups. User-requested jobs get a higher priority than nightly batch work.
+- **Schedules live in code:** pg-boss `schedule()` with IST cron times, kept in `apps/api/src/jobs/schedules.ts`. This replaces Vercel cron and `CRON_SECRET`.
+
+**Jobs the user waits for** (exports and other large reports):
+
+1. `POST /v1/exports` creates an `exports` row (status `queued`), sends the job in the same transaction, and returns **`202`** with the export's id (§7.2).
+2. The worker sets the status to `running`, then `done` (with a file in object storage) or `failed` (with a `ref`).
+3. The screen shows "Preparing your report…" and checks `GET /v1/exports/{id}`. When it's done, it shows a download link: a signed URL that expires. Without JS, the page refreshes itself with a meta refresh.
+4. Files are deleted after 7 days by a cleanup job.
+
+**Where workers run**
+
+- **Start:** inside the API process (`apps/api/src/jobs/`), started with the server and stopped cleanly on shutdown: stop taking jobs, finish or release the current ones, then exit.
+- **When jobs slow down requests:** the same code and container image start in a second mode (`WORKER_ONLY=1`) as a separate worker service. No code changes.
+
+**Watching it**
+
+- queue depth and the age of the oldest job, per queue;
+- failure and retry counts;
+- an alert when a queue backs up or a job lands in the dead-letter queue;
+- the platform console lists failed jobs per org;
+- pg-boss archives finished jobs, and old ones are deleted after 14 days so the tables stay small.
+
+**When to look beyond pg-boss:** many thousands of jobs a second, or event streaming between separate services. Neither is expected at this product's size (§1).
 
 ### 8.4 Backups and recovery
 
@@ -538,6 +581,7 @@ Preview deployments per PR share the staging database, using a temporary org per
 - **Supabase Auth:** no login by name, no organisations, JWT revocation delay, and it ties production to Supabase.
 - **Hand-made access/refresh tokens:** rotation, reuse detection and revocation all become ours, with no benefit for a cookie-based web app.
 - **Schema or database per tenant:** N migrations and drift. Phase 1's practice schema already showed the cost.
+- **BullMQ with Redis for jobs:** a second datastore to run, secure and back up, and jobs couldn't be added in the same transaction as the business write. pg-boss covers this product's job volume.
 - **Microservices:** a team and load this size gains nothing.
 - **NestJS:** more structure than one small team needs, so Fastify plus module rules is enough.
 
@@ -554,6 +598,6 @@ Every step ships on its own, and the first client keeps working throughout as **
 | M2   | Multi-tenancy: `organizations`, `org_id` everywhere (default org #1, backfilled), composite keys, `public_id` (UUIDv7) on every table and the web's URLs switched to it, per-org settings and numbering, RLS with the app role, demo orgs replace the practice schema | isolation tests pass                          |
 | M3   | `apps/api` Fastify skeleton (auth stub, tenant plugin, error shape, logging, health); port modules one at a time, with the web switching each area to the API client (strangler)                                                                                      | `apps/web` has no `db` import left            |
 | M4   | Better Auth: username, organization, admin, 2FA; migrate phase-1 users; invite links; sessions screens; policies; audit events                                                                                                                                        | session and invite tests, e2e sign-in flows   |
-| M5   | Object storage for photos, pg-boss jobs, per-org backups, reminders                                                                                                                                                                                                   | restore drill done on staging                 |
+| M5   | Object storage for photos; pg-boss queue (transactional enqueue, retries, dead-letter queue, monitoring); exports as 202 jobs; per-org backups; reminders                                                                                                             | restore drill done on staging                 |
 | M6   | Production Postgres: provision, migrate, copy org #1's data from Supabase, cut over in a short window                                                                                                                                                                 | old production kept read-only for 2 weeks     |
 | M7   | Platform console, org onboarding, plans and limits, load test                                                                                                                                                                                                         | k6 targets met on staging                     |
