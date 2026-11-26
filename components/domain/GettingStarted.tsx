@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { IntentLink } from "@/components/ui/IntentLink";
 
 import { Icon } from "@/components/ui/Icon";
 import type { Strings } from "@/content/strings";
@@ -32,7 +32,7 @@ export function GettingStarted({
       <ol className="grid gap-2">
         {items.map((item) => (
           <li key={item.key}>
-            <Link
+            <IntentLink
               href={item.href}
               className="flex min-h-12 items-center gap-3 rounded-field px-2 hover:bg-paper"
             >
@@ -48,7 +48,7 @@ export function GettingStarted({
                 {item.label}
               </span>
               <Icon name="chevronRight" size={18} className="text-ink-3" />
-            </Link>
+            </IntentLink>
           </li>
         ))}
       </ol>

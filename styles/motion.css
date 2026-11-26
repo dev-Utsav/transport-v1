@@ -33,8 +33,30 @@
     block-size: auto;
     opacity: 1;
   }
+  /* One summary for every expandable panel: a 44 px row with a chevron that turns when open. */
   summary {
-    list-style-position: outside;
+    display: flex;
+    min-height: 2.75rem;
+    align-items: center;
+    gap: 0.625rem;
+    cursor: pointer;
+    list-style: none;
+  }
+  summary::-webkit-details-marker {
+    display: none;
+  }
+  summary::before {
+    content: "";
+    flex: none;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(-45deg);
+    transition: transform 180ms var(--ease-out);
+  }
+  details[open] > summary::before {
+    transform: rotate(45deg);
   }
 
   /* Messages that appear (Saved, errors) fade up instead of jumping in. */
@@ -58,5 +80,36 @@
   button:active:not(:disabled),
   a[class*="rounded"]:active {
     transform: scale(0.98);
+  }
+
+  /* Click feedback without streaming: LinkPending drops a marker inside the pending link. */
+  @keyframes link-pending {
+    from {
+      transform: scaleX(0.05);
+    }
+    to {
+      transform: scaleX(0.85);
+    }
+  }
+  body:has([data-link-pending])::before {
+    content: "";
+    position: fixed;
+    inset-inline: 0;
+    top: 0;
+    height: 3px;
+    z-index: 60;
+    background: var(--color-signal);
+    transform-origin: left;
+    animation: link-pending 1.6s var(--ease-out) forwards;
+    pointer-events: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    body:has([data-link-pending])::before {
+      animation: none;
+      transform: scaleX(0.6);
+    }
+  }
+  a:has(> [data-link-pending]) {
+    cursor: progress;
   }
 }

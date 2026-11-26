@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { IntentLink } from "@/components/ui/IntentLink";
 
 import { Money } from "@/components/domain/Money";
 import { SearchBar } from "@/components/domain/SearchBar";
@@ -54,20 +54,20 @@ export default async function VendorsPage({
           {dueOnly ? <input type="hidden" name="due" value="1" /> : null}
         </SearchBar>
         <nav className="flex gap-2" aria-label={t.vendors.title}>
-          <Link
+          <IntentLink
             href={`/vendors${q ? `?q=${encodeURIComponent(q)}` : ""}`}
             aria-current={!dueOnly ? "page" : undefined}
             className={`${tab} ${!dueOnly ? "bg-road text-road-text" : "bg-card text-ink-2 ring-1 ring-rule"}`}
           >
             {t.common.all}
-          </Link>
-          <Link
+          </IntentLink>
+          <IntentLink
             href={`/vendors?due=1${q ? `&q=${encodeURIComponent(q)}` : ""}`}
             aria-current={dueOnly ? "page" : undefined}
             className={`${tab} ${dueOnly ? "bg-road text-road-text" : "bg-card text-ink-2 ring-1 ring-rule"}`}
           >
             {t.vendors.dueOnly}
-          </Link>
+          </IntentLink>
         </nav>
         {rows.length ? (
           <RowList>

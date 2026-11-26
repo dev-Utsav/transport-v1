@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { IntentLink } from "@/components/ui/IntentLink";
 
 import { getT } from "@/server/lang";
 
@@ -9,12 +9,12 @@ export default async function NotFound() {
       <div className="grid max-w-sm gap-4 text-center">
         <p className="font-mono text-[15px] text-ink-2">404</p>
         <h1 className="text-[26px] font-bold">{t.common.notFound}</h1>
-        <Link
+        <IntentLink
           href="/"
           className="mx-auto inline-flex min-h-12 items-center rounded-field bg-signal px-5 font-semibold text-card"
         >
           {t.common.goHome}
-        </Link>
+        </IntentLink>
       </div>
     </div>
   );

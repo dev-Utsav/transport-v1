@@ -2,8 +2,8 @@ import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
 import { DEFAULT_ROLE_PERMISSIONS, PERMISSIONS } from "@/lib/access";
-import { ensureAccessCatalog } from "@/server/db/access";
-import { rolePermissions, roles } from "@/server/db/schema";
+import { accessCatalogInSync, ensureAccessCatalog } from "@/server/db/access";
+import { permissions, rolePermissions, roles } from "@/server/db/schema";
 import { setupTestDb } from "@/tests/fixtures/db";
 
 const testDb = setupTestDb();
@@ -45,5 +45,55 @@ describe("access catalog sync on start", () => {
     await ensureAccessCatalog(db);
     const [old] = await db.select().from(roles).where(eq(roles.key, "manager"));
     expect(old?.isActive).toBe(false);
+  });
+
+  it("is in sync on a fresh database, and a start then skips the write", async () => {
+    const { db } = testDb();
+    expect(await accessCatalogInSync(db)).toBe(true);
+    expect(await ensureAccessCatalog(db)).toBe("skipped");
+  });
+
+  it("notices a retired permission and repairs it", async () => {
+    const { db } = testDb();
+    await db
+      .update(permissions)
+      .set({ isRetired: true })
+      .where(eq(permissions.key, PERMISSIONS[0]));
+    expect(await accessCatalogInSync(db)).toBe(false);
+    expect(await ensureAccessCatalog(db)).toBe("synced");
+    expect(await accessCatalogInSync(db)).toBe(true);
+  });
+
+  it("notices admin missing a permission and repairs it", async () => {
+    const { db } = testDb();
+    const [admin] = await db.select().from(roles).where(eq(roles.key, "admin"));
+    if (!admin) throw new Error("admin missing");
+    await db.delete(rolePermissions).where(eq(rolePermissions.roleId, admin.id));
+    expect(await accessCatalogInSync(db)).toBe(false);
+    expect(await ensureAccessCatalog(db)).toBe("synced");
+    expect(await permsOf(db, "admin")).toEqual([...PERMISSIONS].sort());
+    expect(await accessCatalogInSync(db)).toBe(true);
+  });
+
+  it("notices a stray live permission and retires it", async () => {
+    const { db } = testDb();
+    await db.insert(permissions).values({ key: "old.thing" });
+    expect(await accessCatalogInSync(db)).toBe(false);
+    expect(await ensureAccessCatalog(db)).toBe("synced");
+    expect(await accessCatalogInSync(db)).toBe(true);
+  });
+
+  it("notices a missing system role and a stray active system role", async () => {
+    const { db } = testDb();
+    await db.insert(roles).values({ key: "manager", name: "Manager", isSystem: true });
+    expect(await accessCatalogInSync(db)).toBe(false);
+    expect(await ensureAccessCatalog(db)).toBe("synced");
+    expect(await accessCatalogInSync(db)).toBe(true);
+
+    await db.delete(rolePermissions);
+    await db.delete(roles).where(eq(roles.key, "helper"));
+    expect(await accessCatalogInSync(db)).toBe(false);
+    expect(await ensureAccessCatalog(db)).toBe("synced");
+    expect(await accessCatalogInSync(db)).toBe(true);
   });
 });

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { IntentLink } from "@/components/ui/IntentLink";
 
 import { Money } from "@/components/domain/Money";
 import { ScoreBadge } from "@/components/domain/ScoreBadge";
@@ -43,7 +43,7 @@ export default async function PartyScorecardPage({
           <ol className="grid gap-3">
             {rows.map((p, i) => (
               <li key={p.id}>
-                <Link
+                <IntentLink
                   href={`/vendors/${p.id}`}
                   className="grid gap-3 rounded-card bg-card p-4 ring-1 ring-rule hover:ring-rule-strong sm:p-5"
                 >
@@ -72,14 +72,14 @@ export default async function PartyScorecardPage({
                       </span>
                     ) : null}
                   </span>
-                </Link>
+                </IntentLink>
               </li>
             ))}
           </ol>
         ) : (
           <Empty>{r.nothingYet}</Empty>
         )}
-        <details className="rounded-card bg-card p-4 text-[15px] ring-1 ring-rule">
+        <details className="rounded-card bg-card px-4 text-[15px] ring-1 ring-rule open:pb-4">
           <summary className="cursor-pointer font-semibold">{r.howScore}</summary>
           <p className="mt-2 text-ink-2">{r.partyScoreHow}</p>
         </details>

@@ -15,7 +15,7 @@ export function CancelEntry({
 }) {
   return (
     <details className="group rounded-card ring-1 ring-rule" data-no-print>
-      <summary className="cursor-pointer px-4 py-3 text-[15px] font-semibold text-due sm:px-5">
+      <summary className="cursor-pointer px-4 text-[15px] font-semibold text-due sm:px-5">
         {t.common.cancelRecord}
       </summary>
       <form action={action} className="grid gap-3 px-4 pb-4 sm:px-5">

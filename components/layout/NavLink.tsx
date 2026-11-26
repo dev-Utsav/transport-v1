@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { IntentLink } from "@/components/ui/IntentLink";
 import { usePathname } from "next/navigation";
 
 import { isActive } from "@/components/layout/nav";
@@ -30,7 +30,7 @@ export function NavLink({
 
   if (variant === "tab") {
     return (
-      <Link
+      <IntentLink
         href={href}
         data-tour={tour}
         aria-current={active ? "page" : undefined}
@@ -38,19 +38,19 @@ export function NavLink({
       >
         <Icon name={icon} size={24} />
         {label}
-      </Link>
+      </IntentLink>
     );
   }
   return (
-    <Link
+    <IntentLink
       href={href}
       data-tour={tour}
       aria-current={active ? "page" : undefined}
       title={label}
-      className={`flex min-h-11 items-center gap-3 rounded-field px-3 text-[15px] font-semibold whitespace-nowrap transition-colors duration-150 ${active ? "bg-card text-ink shadow-card ring-1 ring-rule" : "text-ink-2 hover:bg-paper-deep hover:text-ink"}`}
+      className={`flex min-h-11 items-center gap-3 rounded-field px-3 group-has-[#sidebar-collapsed:checked]/shell:justify-center group-has-[#sidebar-collapsed:checked]/shell:gap-0 group-has-[#sidebar-collapsed:checked]/shell:px-0 text-[15px] font-semibold whitespace-nowrap transition-colors duration-150 ${active ? "bg-card text-ink shadow-card ring-1 ring-rule" : "text-ink-2 hover:bg-paper-deep hover:text-ink"}`}
     >
       <Icon name={icon} size={20} className={`shrink-0 ${active ? "text-signal" : ""}`} />
-      {label}
-    </Link>
+      <span className="group-has-[#sidebar-collapsed:checked]/shell:sr-only">{label}</span>
+    </IntentLink>
   );
 }

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { IntentLink } from "@/components/ui/IntentLink";
 
 import { FlowBar } from "@/components/domain/FlowBar";
 import { Money } from "@/components/domain/Money";
@@ -31,14 +31,14 @@ export default async function RemindersPage() {
         <RowList>
           {rows.map((v) => (
             <li key={v.id} className="flex flex-wrap items-center gap-3 px-4 py-3.5 sm:px-5">
-              <Link href={`/vendors/${v.id}`} className="min-w-0 flex-1">
+              <IntentLink href={`/vendors/${v.id}`} className="min-w-0 flex-1">
                 <div className="truncate text-[16px] font-semibold">{v.name}</div>
                 <div className="text-[14px] text-ink-2">
                   {v.oldestDue && v.oldestDue !== "0000-00-00"
                     ? `${t.vendors.oldestDue}: ${formatDay(v.oldestDue)}`
                     : t.vendors.openingRow}
                 </div>
-              </Link>
+              </IntentLink>
               <Money paise={v.balance} tone="due" className="text-[17px] font-bold" />
               {v.phone ? (
                 <RemindButton t={t} name={v.name} phone={v.phone} balance={v.balance} compact />

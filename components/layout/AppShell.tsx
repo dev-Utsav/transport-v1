@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { IntentLink } from "@/components/ui/IntentLink";
 import type { ReactNode } from "react";
 
 import { LangSwitch } from "@/components/layout/LangSwitch";
@@ -66,13 +66,13 @@ export function AppShell({
         data-chrome
         className="sticky top-0 hidden h-dvh flex-col gap-6 overflow-x-hidden overflow-y-auto border-r border-rule bg-paper px-4 py-6 lg:flex"
       >
-        <Link href={home} className="flex items-center gap-3 rounded-field px-2">
+        <IntentLink href={home} className="flex items-center gap-3 rounded-field px-2">
           <Mark />
           <span className="grid leading-tight whitespace-nowrap transition-opacity duration-200 group-has-[#sidebar-collapsed:checked]/shell:opacity-0">
             <span className="text-[16px] font-bold tracking-tight">{title}</span>
             <span className="text-[13px] text-ink-2">{t.app.office}</span>
           </span>
-        </Link>
+        </IntentLink>
         <nav aria-label={t.nav.home} className="grid gap-1">
           {side.map(({ need: _need, ...item }) => (
             <NavLink key={item.href} {...item} variant="side" />
@@ -86,10 +86,12 @@ export function AppShell({
           <form action={logout}>
             <button
               title={t.nav.logout}
-              className="flex min-h-11 w-full items-center gap-3 rounded-field px-3 text-[15px] font-semibold whitespace-nowrap text-ink-2 hover:bg-paper-deep hover:text-ink"
+              className="flex min-h-11 w-full items-center gap-3 rounded-field px-3 group-has-[#sidebar-collapsed:checked]/shell:justify-center group-has-[#sidebar-collapsed:checked]/shell:gap-0 group-has-[#sidebar-collapsed:checked]/shell:px-0 text-[15px] font-semibold whitespace-nowrap text-ink-2 hover:bg-paper-deep hover:text-ink"
             >
               <Icon name="logout" size={20} className="shrink-0" />
-              {t.nav.logout}
+              <span className="group-has-[#sidebar-collapsed:checked]/shell:sr-only">
+                {t.nav.logout}
+              </span>
             </button>
           </form>
         </div>
@@ -101,10 +103,10 @@ export function AppShell({
           data-chrome
           className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-rule bg-paper/95 px-4 py-2.5 backdrop-blur lg:hidden"
         >
-          <Link href={home} className="flex min-w-0 items-center gap-2.5">
+          <IntentLink href={home} className="flex min-w-0 items-center gap-2.5">
             <Mark />
             <span className="truncate text-[16px] font-bold tracking-tight">{title}</span>
-          </Link>
+          </IntentLink>
           <div className="w-40 shrink-0">
             <LangSwitch lang={lang} label={t.common.language} />
           </div>
@@ -131,13 +133,13 @@ export function AppShell({
             ))}
             {canBook ? (
               <div className="flex flex-1 items-center justify-center">
-                <Link
+                <IntentLink
                   href="/new"
                   aria-label={t.nav.new}
                   className="-mt-5 flex size-15 items-center justify-center rounded-full bg-signal text-card shadow-lift ring-4 ring-paper transition-transform duration-150 active:scale-95"
                 >
                   <Icon name="plus" size={28} />
-                </Link>
+                </IntentLink>
               </div>
             ) : null}
             {right.map(({ need: _need, ...item }) => (

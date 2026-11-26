@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { IntentLink } from "@/components/ui/IntentLink";
 
 import { ReportActions } from "@/components/domain/ReportActions";
 import { ReportTable } from "@/components/domain/ReportTable";
@@ -54,9 +54,9 @@ export default async function TripProfitPage({
               key: r.id,
               cells: [
                 formatDay(r.departOn),
-                <Link key="t" href={`/trips/${r.id}`} className="font-mono hover:underline">
+                <IntentLink key="t" href={`/trips/${r.id}`} className="font-mono hover:underline">
                   {r.truckNumber}
-                </Link>,
+                </IntentLink>,
                 `${r.fromPlace} → ${r.toPlace}`,
                 <span key="f" className="num">
                   {formatMoney(r.freight)}

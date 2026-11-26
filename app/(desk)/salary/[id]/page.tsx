@@ -99,7 +99,7 @@ export default async function SalaryEntryPage({
         }}
       />
       <Section
-        className="mt-10"
+        className="mt-10 max-w-xl"
         title={t.salary.advancesThisMonth}
         action={
           canGive ? (

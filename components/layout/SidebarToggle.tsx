@@ -31,10 +31,10 @@ export function SidebarToggle({
       <label
         htmlFor={SIDEBAR_INPUT_ID}
         title={label}
-        className="flex min-h-11 cursor-pointer items-center gap-3 rounded-field px-3 text-[15px] font-semibold whitespace-nowrap text-ink-2 transition-colors duration-150 peer-focus-visible:outline-3 peer-focus-visible:outline-signal hover:bg-paper-deep hover:text-ink"
+        className="flex min-h-11 cursor-pointer items-center gap-3 rounded-field px-3 group-has-[#sidebar-collapsed:checked]/shell:justify-center group-has-[#sidebar-collapsed:checked]/shell:gap-0 group-has-[#sidebar-collapsed:checked]/shell:px-0 text-[15px] font-semibold whitespace-nowrap text-ink-2 transition-colors duration-150 peer-focus-visible:outline-3 peer-focus-visible:outline-signal hover:bg-paper-deep hover:text-ink"
       >
         <Icon name="panel" size={20} className="shrink-0" />
-        <span>{label}</span>
+        <span className="group-has-[#sidebar-collapsed:checked]/shell:sr-only">{label}</span>
       </label>
     </>
   );

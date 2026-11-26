@@ -126,7 +126,7 @@ export function SalaryForm({
 
       {isPaid ? null : (
         <details
-          className="grid gap-4 rounded-card bg-card p-4 ring-1 ring-rule"
+          className="rounded-card bg-card px-4 py-1 ring-1 ring-rule open:pb-4"
           open={v("markPaid") === "yes"}
         >
           <summary className="cursor-pointer text-[16px] font-semibold">

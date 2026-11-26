@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { IntentLink } from "@/components/ui/IntentLink";
 import { notFound } from "next/navigation";
 
 import { History } from "@/components/domain/History";
@@ -168,9 +168,9 @@ export default async function VendorPage({
                       </span>
                       <span className="order-1 min-w-0 truncate text-[15px] font-semibold sm:order-none sm:font-normal">
                         {r.href ? (
-                          <Link href={r.href} className="underline-offset-2 hover:underline">
+                          <IntentLink href={r.href} className="underline-offset-2 hover:underline">
                             {label}
-                          </Link>
+                          </IntentLink>
                         ) : (
                           label
                         )}

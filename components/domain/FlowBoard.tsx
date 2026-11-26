@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { IntentLink } from "@/components/ui/IntentLink";
 
 import type { Strings } from "@/content/strings";
 import { fill } from "@/content/strings";
@@ -83,13 +83,13 @@ export function FlowBoard({ t, counts }: { t: Strings; counts: Counts }) {
                   {s.count}
                 </span>
               </span>
-              <Link
+              <IntentLink
                 href={s.href}
                 data-tour={`flow-${stage}-cta`}
                 className={`row-span-2 inline-flex min-h-11 items-center justify-center rounded-field px-3 text-center text-[14px] font-semibold transition-colors duration-150 lg:row-span-1 lg:min-h-12 ${isFirst ? "bg-signal text-card hover:bg-signal-hover" : "bg-paper text-ink ring-1 ring-rule-strong hover:bg-paper-deep"}`}
               >
                 {s.cta}
-              </Link>
+              </IntentLink>
             </li>
           );
         })}

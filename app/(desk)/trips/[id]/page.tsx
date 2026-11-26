@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { IntentLink } from "@/components/ui/IntentLink";
 import { notFound } from "next/navigation";
 
 import { Saved } from "@/components/domain/Saved";
@@ -126,12 +126,12 @@ export default async function TripPage({
           <Section
             title={t.trips.expenses}
             action={
-              <Link
+              <IntentLink
                 href={`/expenses/new?trip=${trip.id}`}
-                className="text-[15px] font-semibold text-signal-ink hover:underline"
+                className="-my-3 py-3 text-[15px] font-semibold text-signal-ink hover:underline"
               >
                 + {t.expenses.new}
-              </Link>
+              </IntentLink>
             }
           >
             <RowList>

@@ -15,5 +15,6 @@ export default defineConfig([
       "prefer-const": "error",
     },
   },
-  globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts"]),
+  // .data holds generated files only (local databases, Playwright reports with bundled JS).
+  globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts", ".data/**"]),
 ]);

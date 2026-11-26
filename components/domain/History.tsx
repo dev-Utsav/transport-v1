@@ -29,7 +29,7 @@ export function History({
 }) {
   if (rows.length === 0) return null;
   return (
-    <details className="rounded-card bg-card px-4 py-3 ring-1 ring-rule sm:px-5" data-no-print>
+    <details className="rounded-card bg-card px-4 ring-1 ring-rule open:pb-3 sm:px-5" data-no-print>
       <summary className="cursor-pointer text-[15px] font-semibold text-ink-2">
         {t.common.changes} · {rows.length}
       </summary>

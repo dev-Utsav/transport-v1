@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { IntentLink } from "@/components/ui/IntentLink";
 import type { ComponentProps, ReactNode } from "react";
 
 import { Icon } from "@/components/ui/Icon";
@@ -29,12 +29,12 @@ export function ButtonLink({
   children,
   className = "",
   ...rest
-}: Common & Omit<ComponentProps<typeof Link>, "className" | "children">) {
+}: Common & Omit<ComponentProps<typeof IntentLink>, "className" | "children">) {
   return (
-    <Link href={href} className={buttonClass(variant, className)} {...rest}>
+    <IntentLink href={href} className={buttonClass(variant, className)} {...rest}>
       {icon ? <Icon name={icon} size={20} /> : null}
       {children}
-    </Link>
+    </IntentLink>
   );
 }
 

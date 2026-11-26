@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { IntentLink } from "@/components/ui/IntentLink";
 
 import { buttonClass } from "@/components/ui/Button";
 import type { Strings } from "@/content/strings";
@@ -88,12 +88,12 @@ function Body({
           ) : (
             <p className="text-ink-2">{t.next.noTrips}</p>
           )}
-          <Link
+          <IntentLink
             href={`/trips/new?challan=${challanId}`}
-            className="text-[15px] font-semibold text-signal-ink underline-offset-2 hover:underline"
+            className="-my-3 py-3 text-[15px] font-semibold text-signal-ink underline-offset-2 hover:underline"
           >
             + {t.next.startTrip}
-          </Link>
+          </IntentLink>
         </>
       );
     case "wait-dispatch":
@@ -105,12 +105,12 @@ function Body({
               truck: truckNumber ?? "",
             })}
           </p>
-          <Link
+          <IntentLink
             href={`/trips/${next.tripId}`}
             className={`${buttonClass("primary")} sm:justify-self-start`}
           >
             {t.next.openTrip}
-          </Link>
+          </IntentLink>
         </>
       );
     case "deliver":
@@ -121,9 +121,9 @@ function Body({
             <input type="hidden" name="id" value={challanId} />
             <button className={buttonClass("primary")}>{t.tripFlow.delivered}</button>
             {next.tripId ? (
-              <Link href={`/trips/${next.tripId}`} className={buttonClass("secondary")}>
+              <IntentLink href={`/trips/${next.tripId}`} className={buttonClass("secondary")}>
                 {t.next.openTrip}
-              </Link>
+              </IntentLink>
             ) : null}
           </form>
         </>
@@ -134,13 +134,13 @@ function Body({
           <p className={text}>{fill(t.next.collect, { amount: formatMoney(next.due) })}</p>
           <div className="flex flex-wrap gap-2">
             {PAY_MODES.map((m) => (
-              <Link
+              <IntentLink
                 key={m}
                 href={`/payments/new?vendor=${partyId}&challan=${challanId}&mode=${m}`}
                 className={buttonClass(m === "cash" ? "primary" : "secondary")}
               >
                 {t.modes[m]}
-              </Link>
+              </IntentLink>
             ))}
           </div>
         </>

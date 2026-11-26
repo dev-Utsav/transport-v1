@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { IntentLink } from "@/components/ui/IntentLink";
 
 import { ReportActions } from "@/components/domain/ReportActions";
 import { ReportTable } from "@/components/domain/ReportTable";
@@ -36,9 +36,9 @@ export default async function OutstandingPage() {
           rows={rows.map((r) => ({
             key: r.id,
             cells: [
-              <Link key="n" href={`/vendors/${r.id}`} className="font-semibold hover:underline">
+              <IntentLink key="n" href={`/vendors/${r.id}`} className="font-semibold hover:underline">
                 {r.name}
-              </Link>,
+              </IntentLink>,
               r.phone || "—",
               <span key="b" className="num">
                 {formatMoney(r.business + r.openingBalance)}
