@@ -1,0 +1,76 @@
+# Production deploy: every push to main builds, migrates the production database, then deploys.
+#
+# Order matters:
+#   1. build first, so a broken build never touches the database;
+#   2. migrate (scripts/migrate.sh: skips applied migrations, one run at a time, refuses and changes
+#      nothing if the files and the database disagree);
+#   3. deploy the build that was just made, only if the migration succeeded.
+# Migrations must stay additive (add tables/columns), because the old deployment keeps serving
+# between step 2 and 3.
+#
+# Vercel's own Git deploys for main are off (vercel.json → git.deploymentEnabled), so this
+# workflow is the only way production changes. Other branches still get Vercel previews.
+#
+# Repository secrets (Settings → Secrets and variables → Actions):
+#   VERCEL_TOKEN       a Vercel access token (Account → Tokens), scoped to the team
+#   VERCEL_ORG_ID      "orgId" from .vercel/project.json
+#   VERCEL_PROJECT_ID  "projectId" from .vercel/project.json
+# DATABASE_URL is not a GitHub secret: it is read from the Vercel production environment, so the
+# app and the migration always use the same database.
+
+name: Production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# One production run at a time, in order; a newer push waits instead of cancelling a migration.
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+  VERCEL_CLI: vercel@65.14.0
+
+jobs:
+  deploy:
+    name: Build, migrate, deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Pull production settings from Vercel
+        run: npx --yes "$VERCEL_CLI" pull --yes --environment=production --token="${{ secrets.VERCEL_TOKEN }}"
+
+      - name: Build
+        run: npx --yes "$VERCEL_CLI" build --prod --token="${{ secrets.VERCEL_TOKEN }}"
+
+      - name: Migrate production database
+        run: bash scripts/migrate.sh .vercel/.env.production.local
+
+      - name: Deploy
+        id: deploy
+        run: |
+          url="$(npx --yes "$VERCEL_CLI" deploy --prebuilt --prod --token="${{ secrets.VERCEL_TOKEN }}")"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Deployed: $url" >> "$GITHUB_STEP_SUMMARY"
