@@ -2,12 +2,21 @@
 
 Newest entry at the top. Rules: `../CLAUDE.md`. Client brief: `Transport Management System Feature Document.docx` (this folder).
 
+## 2026-11-26 (later): production deploys from `main` with automatic migrations (branch `ci/production-deploy`)
+
+- `.github/workflows/production.yml`: push to `main` → `vercel pull` + `vercel build --prod` → `scripts/migrate.sh` → `vercel deploy --prebuilt --prod`. One run at a time, queued. No tests in CI yet (still local, CLAUDE.md §11). Vercel Git deploys of `main` switched off in `vercel.json`.
+- `scripts/migrate.sh` / `scripts/migrate.ts`: idempotent (Drizzle skips applied migrations), advisory lock, `lock_timeout 15s`, and a guard (`scripts/migrate-plan.ts`, unit tested) that refuses on an edited applied migration, an unknown applied migration (older code), or a back-dated new one.
+- Found while testing on the Singapore staging DB: applied hashes mixed CRLF (Windows checkouts: 0000, 0002) and LF (0001). The guard compares ignoring line endings; `.gitattributes` now pins `drizzle/*.sql` and `*.sh` to LF so future hashes match everywhere.
+- Verified on Singapore: two runs = "up to date", two at once = the second waits. **Open:** add the 3 GitHub secrets (DEPLOY.md §4) and confirm `.vercel/project.json` is linked to the production project before the first push to `main`.
+
 ## 2026-11-26: slow first clicks, prefetch storm, responsive fixes (branch `perf/startup-prefetch-responsive`)
 
 ### Why
+
 On staging a click on GST waited ~10 s (7 requests finishing together). Measured in Edge: warm GST is ~150 ms; the wait was server start-up / a free connection, made worse by ~40 background prefetches per full page load (every sidebar and report link, each a DB-backed render) on a 5-connection pool.
 
 ### Changes
+
 - **Start-up** (`server/db/index.ts`, `server/db/access.ts`): one timing line per instance in the logs (`[db] real desk ready in … ms (connect, settings+catalog synced|skipped, seed)`); the permission catalog is checked with one read (`accessCatalogInSync`) and the write transaction only runs when the code changed; settings row and catalog run in parallel. Singapore staging: 2366 ms (synced) → 881 ms (skipped).
 - **Pool:** real desk `max 3`, practice `2`, `idle_timeout 20 s` (was 5 / kept forever), so idle Vercel instances give pooler slots back.
 - **Prefetch only on intent:** every `next/link` replaced by `components/ui/IntentLink.tsx` (prefetches on hover / touch / focus). Full load of Reports: ~40 prefetches → 0. A unit test refuses direct `next/link` imports.
@@ -16,18 +25,22 @@ On staging a click on GST waited ~10 s (7 requests finishing together). Measured
 - ESLint ignores `.data/**` (generated databases and Playwright reports).
 
 ### Checks
+
 `pnpm check` green (134 tests), `pnpm test:e2e` 172 passed (phone + desktop, EN + HI, no-JS, roles 404), all 18 tour hooks present (full tour walk not repeated). Production build run against the Singapore staging DB: sign-in, GST (370–880 ms from India), CSV, salary, practice desk.
 
 ### Found on the way
+
 - **Singapore staging DB was missing migration `0002_advances_arrival`** (salary page failed with `relation "staff_advances" does not exist`). Applied with `scripts/migrate.ts` on 2026-11-26. **Production (Mumbai) needs `pnpm db:migrate` before this and the advances release are deployed.**
 - Staging runs in `bom1` against a Singapore database: every query crosses regions (~60–70 ms each), so staging will always feel slower than production.
 
 ### Open points
+
 - Inline links inside text (party names on challans, trips on a party, "Settings" on GST) are still under 44 px; padding would overlap neighbours. Decide whether to restyle as rows.
 
 ## 2026-11-25 (evening): advance khata, scorecards, motion, flow fixes (branch `feat/advances-reports-flow`)
 
 ### Advances to staff (Office work)
+
 - **Client rules (Utsav, 2026-11-25):** many small cash advances a day; taken off salary automatically; what the salary can't cover **carries to next month**; **admin and office** record them, only admin cancels.
 - `staff_advances` table (khata rows, never edited, cancelled only). Owed at a month's end = advances up to then − what earlier months took off (`salary_months.advance` now means "taken off this month"). `lib/salary.ts`: deductions first, then advance as far as the pay goes, rest `advanceCarried`.
 - Unpaid months follow new advances live; a paid month is frozen; cancelling an advance is refused once that month (or later) is paid.
@@ -35,16 +48,19 @@ On staging a click on GST waited ~10 s (7 requests finishing together). Measured
 - Migration `0002_advances_arrival`: table + RLS, old hand-typed advances moved into the khata, `trips.arrived_on` (filled from the change history), `advances.record` granted to the existing office role.
 
 ### Reports
+
 - Reports index in two groups: **Money** and **Who is doing well**.
 - `/reports/money`: in / out / left over for a month, received by mode, spent on (categories + salaries + advances), 6-month in vs out.
 - `/reports/parties`: party score 0–100 (paid 50, oldest unpaid under 15 days 30, business vs biggest party 20), every part shown.
 - `/reports/performance`: drivers and **hired truck owners** (grouped by the truck's owner name) by on-time arrival (70) and trips (30); trucks by profit. On time = `arrived_on` ≤ `expected_on`.
 
 ### Motion and menu
+
 - `styles/motion.css`: screens settle in (`app/(desk)/template.tsx`), `<details>` panels open smoothly, messages fade in, buttons press. Transform/opacity only; reduced motion honoured.
 - **Compact menu** on desktop: checkbox + CSS `:has()` (works without JS), remembered in cookie `td_sidebar`.
 
 ### Flow fixes (from a walk at 390 px)
+
 - A loading truck with nothing on it asks to **load first**; the server refuses to send off an empty truck.
 - A closed trip with money due shows **Collect the money still due** and a **Take payment** per party, which comes back to the trip.
 - **Every save replaces the form in history** (`RedirectType.replace`): the phone's Back no longer reopens a filled form (a second Save used to book a duplicate). Unit test guards it.
@@ -53,6 +69,7 @@ On staging a click on GST waited ~10 s (7 requests finishing together). Measured
 - The big "mark arrived" button now records the arrival day (on-time scores depend on it).
 
 ### Open points (new, for the client)
+
 - Score weights and bands (Good ≥ 75, Watch 50–74, Poor < 50) are our default: confirm or change in `lib/score.ts`.
 - Hired truck owners are grouped by the name typed on the truck; a proper owner record (phone, rates, payments to them) would make the score sharper.
 - Not built yet (seen in comparable tools): fuel log and mileage per truck, truck documents due (insurance, fitness, permit, PUC), POD photo/signature, e-way bill, TDS on lorry hire, trip cash given to drivers vs bills brought back.

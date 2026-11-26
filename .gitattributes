@@ -1,0 +1,4 @@
+# Migrations are hashed by Drizzle when applied: one line ending everywhere keeps those hashes
+# stable across Windows and CI checkouts. Shell scripts must be LF to run on Linux.
+drizzle/*.sql text eol=lf
+*.sh text eol=lf

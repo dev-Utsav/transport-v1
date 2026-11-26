@@ -44,7 +44,7 @@ Type these at Vercel's prompt (`! npx vercel env add NAME ENV`):
 
 ```sh
 npx vercel env pull .env.staging.local --environment=preview   # git-ignored
-pnpm exec tsx --env-file=.env.staging.local scripts/migrate.ts  # tables + RLS
+bash scripts/migrate.sh .env.staging.local                      # tables + RLS (safe to repeat)
 npx vercel deploy                                               # prints the staging URL
 ```
 
@@ -70,11 +70,41 @@ where relnamespace = 'public'::regnamespace and relkind = 'r' and not relrowsecu
 
 ## 4. Production (only after staging passes)
 
+### Automatic: every push to `main` (`.github/workflows/production.yml`)
+
+Merging a pull request into `main` runs **build → migrate → deploy**:
+
+1. `vercel pull` (production settings, including `DATABASE_URL`) and `vercel build --prod`. A broken build stops here and the database is never touched.
+2. `scripts/migrate.sh` against the production database:
+   - **idempotent**: migrations already applied are skipped; with nothing new it only prints "Database is up to date";
+   - **one run at a time**: an advisory lock makes a second deploy wait (up to 5 min);
+   - **refuses and changes nothing** if an applied migration file was edited, the database has a migration this code lacks (older code), or a new migration is dated before the last applied one (`scripts/migrate-plan.ts`, unit tested). Line endings don't count as edits;
+   - `lock_timeout 15s`: a migration stuck behind live traffic fails and rolls back instead of blocking the site; all pending migrations run in one transaction.
+3. `vercel deploy --prebuilt --prod` of that same build, only if the migration succeeded.
+
+Runs queue in order (never cancelled mid-migration). Vercel's own Git deploys of `main` are off (`vercel.json` → `git.deploymentEnabled`), so this workflow is the only path to production; other branches still get previews. **Migrations must be additive** (new tables/columns, backfills): the old deployment keeps serving between step 2 and 3.
+
+**One-time setup** (GitHub → repository → Settings → Secrets and variables → Actions → New repository secret, or `! gh secret set NAME`):
+
+| Secret              | Value                                                                                     |
+| ------------------- | ----------------------------------------------------------------------------------------- |
+| `VERCEL_TOKEN`      | Vercel → Account Settings → Tokens → create, scoped to the project's team                 |
+| `VERCEL_ORG_ID`     | `orgId` in `.vercel/project.json` (after `npx vercel link` to the **production** project) |
+| `VERCEL_PROJECT_ID` | `projectId` in the same file                                                              |
+
+`DATABASE_URL` is read from Vercel's production environment, not stored in GitHub. If it is marked **Sensitive** in Vercel, `vercel pull` can't read it and the migrate step stops with "DATABASE_URL is not set": un-mark it, or tell the developer to switch the step to a GitHub secret.
+
+Optional: GitHub → Settings → Environments → `production` → required reviewers, so each production deploy waits for a click.
+
+### By hand (first deploy, or if GitHub Actions is down)
+
 ```sh
 npx vercel env pull .env.production.local --environment=production
-pnpm exec tsx --env-file=.env.production.local scripts/migrate.ts
+bash scripts/migrate.sh .env.production.local
 npx vercel deploy --prod
 ```
+
+### After the first deploy
 
 1. Open the site. The owner signs in with the setup key and creates their admin login. The key does nothing after that.
 2. Settings → Users: one login per person (5–6), each with their role. A driver login links to the driver in Staff. Everyone changes their first password at first sign-in.
