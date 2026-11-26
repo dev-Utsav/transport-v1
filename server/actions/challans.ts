@@ -1,7 +1,7 @@
 "use server";
 
 import { and, eq, sql } from "drizzle-orm";
-import { redirect } from "next/navigation";
+import { redirect, RedirectType } from "next/navigation";
 import { z } from "zod";
 
 import { failed, formValues, zf } from "@/lib/form";
@@ -170,7 +170,7 @@ export async function createChallan(_prev: FormState, formData: FormData): Promi
       return created.id;
     });
     refreshDesk();
-    redirect(`/challans/${id}?saved=1`);
+    redirect(`/challans/${id}?saved=1`, RedirectType.replace);
   });
 }
 
@@ -200,7 +200,7 @@ export async function editChallan(_prev: FormState, formData: FormData): Promise
       await logChange(tx, "challan", id, "update", before, after);
     });
     refreshDesk();
-    redirect(`/challans/${id}`);
+    redirect(`/challans/${id}?saved=1`, RedirectType.replace);
   });
 }
 
@@ -241,5 +241,5 @@ export async function cancelChallan(formData: FormData): Promise<void> {
       });
   });
   refreshDesk();
-  redirect(`/challans/${id}`);
+  redirect(`/challans/${id}`, RedirectType.replace);
 }

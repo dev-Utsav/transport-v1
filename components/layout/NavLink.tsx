@@ -46,9 +46,10 @@ export function NavLink({
       href={href}
       data-tour={tour}
       aria-current={active ? "page" : undefined}
-      className={`flex min-h-11 items-center gap-3 rounded-field px-3 text-[15px] font-semibold transition-colors duration-150 ${active ? "bg-card text-ink shadow-card ring-1 ring-rule" : "text-ink-2 hover:bg-paper-deep hover:text-ink"}`}
+      title={label}
+      className={`flex min-h-11 items-center gap-3 rounded-field px-3 text-[15px] font-semibold whitespace-nowrap transition-colors duration-150 ${active ? "bg-card text-ink shadow-card ring-1 ring-rule" : "text-ink-2 hover:bg-paper-deep hover:text-ink"}`}
     >
-      <Icon name={icon} size={20} className={active ? "text-signal" : ""} />
+      <Icon name={icon} size={20} className={`shrink-0 ${active ? "text-signal" : ""}`} />
       {label}
     </Link>
   );

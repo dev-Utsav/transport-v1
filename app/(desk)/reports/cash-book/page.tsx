@@ -38,6 +38,12 @@ export default async function CashBookPage({
       note: s.name,
       amount: s.amount,
     })),
+    ...book.advs.map((a) => ({
+      key: `a${a.id}`,
+      label: t.salary.advances,
+      note: a.name,
+      amount: a.amount,
+    })),
   ];
   return (
     <>

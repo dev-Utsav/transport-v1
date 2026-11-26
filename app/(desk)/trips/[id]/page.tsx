@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { Saved } from "@/components/domain/Saved";
 import { FlowBar } from "@/components/domain/FlowBar";
 import { Money } from "@/components/domain/Money";
 import { LoadPanel } from "@/components/domain/trip/LoadPanel";
@@ -28,8 +29,15 @@ export const metadata: Metadata = { title: "Trip" };
  * One truck's trip, laid out in flow order: the road and its next action, then (while loading)
  * the parcels waiting for a truck, then what is on the truck, then the trip's money.
  */
-export default async function TripPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function TripPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ saved?: string }>;
+}) {
   const id = Number((await params).id);
+  const { saved } = await searchParams;
   const actor = await requireAccess("trips.view");
   const [t, settings, detail] = await Promise.all([
     getT(),
@@ -45,6 +53,7 @@ export default async function TripPage({ params }: { params: Promise<{ id: strin
     deliver: can(actor, "trips.deliver"),
     openChallans: can(actor, "challans.view"),
     openParties: can(actor, "parties.view"),
+    takePayment: can(actor, "payments.record"),
   };
   const showMoney = can(actor, "expenses.view");
   const waiting = trip.status === "loading" && allowed.load ? await waitingChallans() : [];
@@ -52,6 +61,7 @@ export default async function TripPage({ params }: { params: Promise<{ id: strin
   return (
     <>
       <FlowBar t={t} current={tripStage(trip.status)} />
+      <Saved show={saved === "1"} label={t.common.saved} />
       <PageHead
         back={{ href: "/trips", label: t.trips.title }}
         title={<span className="font-mono tracking-wide">{trip.truckNumber}</span>}
@@ -73,7 +83,14 @@ export default async function TripPage({ params }: { params: Promise<{ id: strin
       />
 
       <div className="grid gap-8">
-        <TripNextAction t={t} trip={trip} undelivered={totals.undelivered} can={allowed} />
+        <TripNextAction
+          t={t}
+          trip={trip}
+          undelivered={totals.undelivered}
+          loaded={groups.length}
+          due={totals.due}
+          can={allowed}
+        />
 
         {trip.status === "loading" && allowed.load ? (
           <LoadPanel
@@ -85,7 +102,7 @@ export default async function TripPage({ params }: { params: Promise<{ id: strin
           />
         ) : null}
 
-        <Section title={t.trips.onTruck}>
+        <Section title={t.trips.onTruck} id="on-truck">
           <Stats
             items={[
               { label: t.trips.parties, value: groups.length },

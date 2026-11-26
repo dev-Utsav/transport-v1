@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { Saved } from "@/components/domain/Saved";
 import { MasterRow } from "@/components/domain/MasterRow";
 import { TruckForm } from "@/components/forms/MasterForms";
 import { PageHead, Section } from "@/components/ui/PageHead";
@@ -13,14 +14,15 @@ export const metadata: Metadata = { title: "Trucks" };
 export default async function TrucksPage({
   searchParams,
 }: {
-  searchParams: Promise<{ edit?: string }>;
+  searchParams: Promise<{ edit?: string; saved?: string }>;
 }) {
   await requireAccess("masters.manage");
-  const { edit } = await searchParams;
+  const { edit, saved } = await searchParams;
   const [t, trucks] = await Promise.all([getT(), truckOptions(true)]);
   const editing = trucks.find((tk) => String(tk.id) === edit);
   return (
     <>
+      <Saved show={saved === "1"} label={t.common.saved} />
       <PageHead back={{ href: "/settings", label: t.settings.title }} title={t.settings.trucks} />
       <div className="grid max-w-2xl gap-8">
         <Section title={editing ? `${t.common.edit} · ${editing.number}` : t.settings.newTruck}>

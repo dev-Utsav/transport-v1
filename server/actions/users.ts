@@ -1,7 +1,7 @@
 "use server";
 
 import { and, eq, inArray, ne, sql } from "drizzle-orm";
-import { redirect } from "next/navigation";
+import { redirect, RedirectType } from "next/navigation";
 import { z } from "zod";
 
 import { formValues, zf } from "@/lib/form";
@@ -133,7 +133,7 @@ export async function saveUser(_prev: FormState, formData: FormData): Promise<Fo
     });
     if (result === "lastAdmin") return fail(values, "roleIds-lastAdmin");
     refreshDesk();
-    redirect("/settings/users");
+    redirect("/settings/users?saved=1", RedirectType.replace);
   });
 }
 
@@ -164,7 +164,7 @@ export async function toggleUser(_prev: FormState, formData: FormData): Promise<
     });
     if (result === "lastAdmin") return fail({}, "lastAdmin");
     refreshDesk();
-    redirect(`/settings/users/${id}`);
+    redirect(`/settings/users/${id}?saved=1`, RedirectType.replace);
   });
 }
 
@@ -189,6 +189,6 @@ export async function resetUserPassword(_prev: FormState, formData: FormData): P
         .where(eq(users.id, id));
       await logChange(tx, "user", id, "update", null, { password: "reset" });
     });
-    redirect(`/settings/users/${id}?reset=1`);
+    redirect(`/settings/users/${id}?reset=1`, RedirectType.replace);
   });
 }

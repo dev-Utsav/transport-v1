@@ -1,7 +1,7 @@
 "use server";
 
 import { and, eq } from "drizzle-orm";
-import { redirect } from "next/navigation";
+import { redirect, RedirectType } from "next/navigation";
 import { z } from "zod";
 
 import { failed, formValues, zf } from "@/lib/form";
@@ -55,7 +55,10 @@ export async function recordPayment(_prev: FormState, formData: FormData): Promi
     });
     refreshDesk();
     // Back on the party's page, which offers the WhatsApp receipt for this payment.
-    redirect(back ?? `/vendors/${data.vendorId}?saved=1&payment=${paymentId}`);
+    redirect(
+      back ?? `/vendors/${data.vendorId}?saved=1&payment=${paymentId}`,
+      RedirectType.replace,
+    );
   });
 }
 
@@ -109,7 +112,7 @@ export async function addExpense(_prev: FormState, formData: FormData): Promise<
       await logChange(tx, "expense", created.id, "create", null, created);
     });
     refreshDesk();
-    redirect(`/expenses?month=${parsed.data.spentOn.slice(0, 7)}&saved=1`);
+    redirect(`/expenses?month=${parsed.data.spentOn.slice(0, 7)}&saved=1`, RedirectType.replace);
   });
 }
 

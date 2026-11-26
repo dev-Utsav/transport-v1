@@ -15,16 +15,21 @@ import { saveSalaryEntry } from "@/server/actions/salary";
 
 const NUMBER_FIELDS = ["present", "absent", "halfDays"] as const;
 
-/** Attendance, advance and deductions with the net worked out live (same function as the server). */
+/**
+ * Attendance and deductions with the net worked out live (same function as the server).
+ * Advances come from the khata (`advanceOwed`), never typed here.
+ */
 export function SalaryForm({
   t,
   monthlySalary,
+  advanceOwed,
   month,
   isPaid,
   initial,
 }: {
   t: Pick<Strings, "common" | "salary" | "modes">;
   monthlySalary: number;
+  advanceOwed: number;
   month: string;
   isPaid: boolean;
   initial: Record<string, string>;
@@ -40,7 +45,7 @@ export function SalaryForm({
       month,
       present: int("present"),
       halfDays: int("halfDays"),
-      advance: parseRupees(values.advance ?? "") ?? 0,
+      advance: advanceOwed,
       deduction: parseRupees(values.deduction ?? "") ?? 0,
     });
   }
@@ -80,24 +85,14 @@ export function SalaryForm({
           </Field>
         ))}
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <Field id="advance" label={t.salary.advance} error={e("advance")} c={c}>
-          <MoneyInput
-            id="advance"
-            name="advance"
-            defaultValue={v("advance")}
-            invalid={Boolean(e("advance"))}
-          />
-        </Field>
-        <Field id="deduction" label={t.salary.deduction} error={e("deduction")} c={c}>
-          <MoneyInput
-            id="deduction"
-            name="deduction"
-            defaultValue={v("deduction")}
-            invalid={Boolean(e("deduction"))}
-          />
-        </Field>
-      </div>
+      <Field id="deduction" label={t.salary.deduction} error={e("deduction")} c={c}>
+        <MoneyInput
+          id="deduction"
+          name="deduction"
+          defaultValue={v("deduction")}
+          invalid={Boolean(e("deduction"))}
+        />
+      </Field>
       <Field id="note" label={c.note} c={c} optional>
         <TextInput id="note" name="note" defaultValue={v("note")} />
       </Field>
@@ -113,6 +108,16 @@ export function SalaryForm({
           </dt>
           <dd className="num">{formatMoney(live.earned)}</dd>
         </div>
+        <div className="flex justify-between text-[15px]">
+          <dt className="text-road-muted">− {t.salary.advance}</dt>
+          <dd className="num">{formatMoney(live.advanceCut)}</dd>
+        </div>
+        {live.advanceCarried > 0 ? (
+          <div className="flex justify-between text-[15px]">
+            <dt className="text-road-muted">{t.salary.carried}</dt>
+            <dd className="num">{formatMoney(live.advanceCarried)}</dd>
+          </div>
+        ) : null}
         <div className="mt-1 flex items-baseline justify-between border-t border-road-2 pt-2">
           <dt className="text-[16px] font-semibold">{t.salary.net}</dt>
           <dd className="num text-[28px] font-bold">{formatMoney(live.net)}</dd>

@@ -34,7 +34,9 @@ export function secret(): string {
  * on the practice desk). Null when not signed in, deactivated, or signed out by a version bump.
  */
 export const getActor = cache(async (): Promise<Actor | null> => {
-  const claims = await verifySession(secret(), (await cookies()).get(SESSION_COOKIE)?.value);
+  // Cookie first: it marks the route dynamic before the secret is needed.
+  const cookie = (await cookies()).get(SESSION_COOKIE)?.value;
+  const claims = await verifySession(secret(), cookie);
   if (!claims) return null;
   const db = await getRealDb();
   const rows = await db
@@ -63,7 +65,9 @@ export const getActor = cache(async (): Promise<Actor | null> => {
  * action's transaction, where a second query could wait on the transaction's own connection.
  */
 export async function sessionUserId(): Promise<number | null> {
-  const claims = await verifySession(secret(), (await cookies()).get(SESSION_COOKIE)?.value);
+  // Cookie first: it marks the route dynamic before the secret is needed.
+  const cookie = (await cookies()).get(SESSION_COOKIE)?.value;
+  const claims = await verifySession(secret(), cookie);
   return claims?.userId ?? null;
 }
 

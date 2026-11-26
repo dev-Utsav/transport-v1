@@ -14,6 +14,7 @@ import {
   payments,
   roles,
   salaryMonths,
+  staffAdvances,
   settings,
   trips,
   trucks,
@@ -402,7 +403,6 @@ export async function seedSampleIfEmpty(db: Database): Promise<void> {
           present: 18,
           absent: 1,
           halfDays: 1,
-          advance: 300000,
         },
         {
           staffId: e2.id,
@@ -413,6 +413,20 @@ export async function seedSampleIfEmpty(db: Database): Promise<void> {
           halfDays: 0,
         },
       ]);
+      // Small cash advances through the month (the khata), taken off salary automatically.
+      await tx.insert(staffAdvances).values(
+        [
+          { staffId: e1.id, day: 3, amount: 100000 },
+          { staffId: e1.id, day: 3, amount: 20000 },
+          { staffId: e1.id, day: 9, amount: 150000 },
+          { staffId: e2.id, day: 12, amount: 25000 },
+          { staffId: e1.id, day: 15, amount: 30000 },
+        ].map(({ day, ...a }) => ({
+          ...a,
+          givenOn: `${month}-${String(Math.min(day, Number(today.slice(8)))).padStart(2, "0")}`,
+          mode: "cash" as const,
+        })),
+      );
     }
   });
 }
@@ -426,6 +440,7 @@ export async function resetSample(db: Database): Promise<void> {
       expenses,
       challans,
       trips,
+      staffAdvances,
       salaryMonths,
       vendors,
       staff,

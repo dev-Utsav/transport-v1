@@ -1,7 +1,7 @@
 "use server";
 
 import { eq } from "drizzle-orm";
-import { redirect } from "next/navigation";
+import { redirect, RedirectType } from "next/navigation";
 import { z } from "zod";
 
 import { failed, formValues, zf } from "@/lib/form";
@@ -57,7 +57,7 @@ export async function saveVendor(_prev: FormState, formData: FormData): Promise<
       return created.id;
     });
     refreshDesk();
-    redirect(back ?? `/vendors/${savedId}`);
+    redirect(back ?? `/vendors/${savedId}?saved=1`, RedirectType.replace);
   });
 }
 

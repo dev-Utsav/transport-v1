@@ -2,6 +2,10 @@ import type { IconName } from "@/components/ui/Icon";
 import type { Strings } from "@/content/strings";
 import type { Permission } from "@/lib/access";
 
+/** Compact desktop menu: the checkbox id the shell's CSS reads, and the cookie that remembers it. */
+export const SIDEBAR_INPUT_ID = "sidebar-collapsed";
+export const SIDEBAR_COOKIE = "td_sidebar";
+
 /** `need`: shown when the person holds any of these (empty = everyone signed in). */
 export type NavItem = {
   href: string;

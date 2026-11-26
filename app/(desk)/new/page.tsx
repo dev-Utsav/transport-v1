@@ -4,22 +4,36 @@ import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
 import type { IconName } from "@/components/ui/Icon";
 import { PageHead } from "@/components/ui/PageHead";
-import { requireAccess } from "@/server/auth";
+import type { Permission } from "@/lib/access";
+import { can, requireAccess } from "@/server/auth";
 import { getT } from "@/server/lang";
 
 export const metadata: Metadata = { title: "New" };
 
-/** The tab bar's + button: the four everyday entries, one tap each. */
+/** The tab bar's + button: the everyday entries this person may make, one tap each. */
 export default async function NewPage() {
-  await requireAccess("challans.book");
+  const actor = await requireAccess("challans.book");
   const t = await getT();
-  const items: { href: string; label: string; icon: IconName }[] = [
-    { href: "/challans/new", label: t.home.newChallan, icon: "receipt" },
-    { href: "/trips/new", label: t.home.newTrip, icon: "truck" },
-    { href: "/payments/new", label: t.home.recordPayment, icon: "rupee" },
-    { href: "/expenses/new", label: t.home.addExpense, icon: "wallet" },
-    { href: "/vendors/new", label: t.vendors.new, icon: "users" },
-  ];
+  const items = (
+    [
+      { href: "/challans/new", label: t.home.newChallan, icon: "receipt", need: "challans.book" },
+      { href: "/trips/new", label: t.home.newTrip, icon: "truck", need: "trips.manage" },
+      {
+        href: "/payments/new",
+        label: t.home.recordPayment,
+        icon: "rupee",
+        need: "payments.record",
+      },
+      { href: "/expenses/new", label: t.home.addExpense, icon: "wallet", need: "expenses.record" },
+      {
+        href: "/salary/advances",
+        label: t.salary.giveAdvance,
+        icon: "idCard",
+        need: "advances.record",
+      },
+      { href: "/vendors/new", label: t.vendors.new, icon: "users", need: "parties.manage" },
+    ] satisfies { href: string; label: string; icon: IconName; need: Permission }[]
+  ).filter((item) => can(actor, item.need));
   return (
     <>
       <PageHead title={t.nav.new} />

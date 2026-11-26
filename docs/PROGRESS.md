@@ -2,6 +2,48 @@
 
 Newest entry at the top. Rules: `../CLAUDE.md`. Client brief: `Transport Management System Feature Document.docx` (this folder).
 
+## 2026-11-25 (evening): advance khata, scorecards, motion, flow fixes (branch `feat/advances-reports-flow`)
+
+### Advances to staff (Office work)
+- **Client rules (Utsav, 2026-11-25):** many small cash advances a day; taken off salary automatically; what the salary can't cover **carries to next month**; **admin and office** record them, only admin cancels.
+- `staff_advances` table (khata rows, never edited, cancelled only). Owed at a month's end = advances up to then − what earlier months took off (`salary_months.advance` now means "taken off this month"). `lib/salary.ts`: deductions first, then advance as far as the pay goes, rest `advanceCarried`.
+- Unpaid months follow new advances live; a paid month is frozen; cancelling an advance is refused once that month (or later) is paid.
+- Screens: `/salary/advances` (quick entry, comes back empty for the next one, day list + total), khata on each person's salary page, Give advance on Home office work, + New and Salary. Cash advances are in the cash book and its CSV.
+- Migration `0002_advances_arrival`: table + RLS, old hand-typed advances moved into the khata, `trips.arrived_on` (filled from the change history), `advances.record` granted to the existing office role.
+
+### Reports
+- Reports index in two groups: **Money** and **Who is doing well**.
+- `/reports/money`: in / out / left over for a month, received by mode, spent on (categories + salaries + advances), 6-month in vs out.
+- `/reports/parties`: party score 0–100 (paid 50, oldest unpaid under 15 days 30, business vs biggest party 20), every part shown.
+- `/reports/performance`: drivers and **hired truck owners** (grouped by the truck's owner name) by on-time arrival (70) and trips (30); trucks by profit. On time = `arrived_on` ≤ `expected_on`.
+
+### Motion and menu
+- `styles/motion.css`: screens settle in (`app/(desk)/template.tsx`), `<details>` panels open smoothly, messages fade in, buttons press. Transform/opacity only; reduced motion honoured.
+- **Compact menu** on desktop: checkbox + CSS `:has()` (works without JS), remembered in cookie `td_sidebar`.
+
+### Flow fixes (from a walk at 390 px)
+- A loading truck with nothing on it asks to **load first**; the server refuses to send off an empty truck.
+- A closed trip with money due shows **Collect the money still due** and a **Take payment** per party, which comes back to the trip.
+- **Every save replaces the form in history** (`RedirectType.replace`): the phone's Back no longer reopens a filled form (a second Save used to book a duplicate). Unit test guards it.
+- **Back goes where you came from**, named by that screen's heading (per-tab trail in sessionStorage); without history it is the old fixed link.
+- Saved confirmation after trip, party, truck, driver, staff, login and challan edit saves.
+- The big "mark arrived" button now records the arrival day (on-time scores depend on it).
+
+### Open points (new, for the client)
+- Score weights and bands (Good ≥ 75, Watch 50–74, Poor < 50) are our default: confirm or change in `lib/score.ts`.
+- Hired truck owners are grouped by the name typed on the truck; a proper owner record (phone, rates, payments to them) would make the score sharper.
+- Not built yet (seen in comparable tools): fuel log and mileage per truck, truck documents due (insurance, fitness, permit, PUC), POD photo/signature, e-way bill, TDS on lorry hire, trip cash given to drivers vs bills brought back.
+
+## 2026-11-25: staging on Vercel, database moved to Mumbai, connection pool
+
+- **Vercel project `transport-desk`** linked (`.vercel/`, git-ignored). Staging values are Preview-only. `.vercelignore` added so a CLI deploy never uploads `.env*` or `.data/`.
+- **Hobby blocks deploys of commits by non-members** (Razin's commits on this branch). Staging was deployed from a clean copy without git history; the lasting fix is Vercel Pro with Razin on the team.
+- **Staging database moved Singapore → Mumbai** (new Supabase project, session pooler `aws-0-ap-south-1`, migrated, RLS on every table, seeded on first request). Singapore made every query a ~60 ms hop from `bom1`.
+- **Pool (`server/db/index.ts`):** real desk `max: 5`, practice `max: 2`, `idle_timeout: 0` (connections kept open; before, they closed after 5 s and the next request paid the pooler handshake), `max_lifetime` 30 min. Supabase's free session pooler allows ~15 clients across all instances: raise only with a bigger plan.
+- **Measured on the preview** (signed in, from Kadodara, incl. ~0.1 s network): Home, Trips, Challans, Parties, Reports 0.12–0.29 s. Sign-in page ≈ a static file (0.10 s).
+- Preview `SESSION_SECRET` was under 32 chars (build refused): replaced with a generated one.
+- Open: production Supabase project in Mumbai with its own password; production env vars (no `SEED_DEMO`); the first production deploy (no env) is still live at transport-desk-psi.vercel.app.
+
 ## 2026-11-24: hardening before the first deploy (branch `fix/pre-deploy-hardening`)
 
 Asked by the backend consultant: security and backend testing for 5–6 users, every error handled without exposing raw errors or blocking the app, then staging and production today. Context was built with code-review-graph (203 files, 732 nodes).

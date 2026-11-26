@@ -4,6 +4,8 @@ import type { ReactNode } from "react";
 import { LangSwitch } from "@/components/layout/LangSwitch";
 import { allowedNav, mainNav, tabNav } from "@/components/layout/nav";
 import { NavLink } from "@/components/layout/NavLink";
+import { NavTrail } from "@/components/layout/NavTrail";
+import { SidebarToggle } from "@/components/layout/SidebarToggle";
 import { TourHost } from "@/components/tour/TourHost";
 import { Icon } from "@/components/ui/Icon";
 import type { Lang, Strings } from "@/content/strings";
@@ -32,6 +34,7 @@ export function AppShell({
   businessName,
   permissions,
   isPractice,
+  sidebarCollapsed,
   children,
 }: {
   t: Strings;
@@ -39,6 +42,7 @@ export function AppShell({
   businessName: string;
   permissions: ReadonlySet<Permission>;
   isPractice: boolean;
+  sidebarCollapsed: boolean;
   children: ReactNode;
 }) {
   const tabs = tabNav(t);
@@ -49,7 +53,8 @@ export function AppShell({
   const home = permissions.has("challans.view") ? "/" : "/trips";
   const title = businessName || t.app.name;
   return (
-    <div className="min-h-dvh lg:grid lg:grid-cols-[264px_1fr]">
+    // Compact menu: the checkbox in SidebarToggle narrows the first column (CSS :has, no JS needed).
+    <div className="group/shell min-h-dvh lg:grid lg:grid-cols-[264px_1fr] lg:transition-[grid-template-columns] lg:duration-200 lg:ease-(--ease-out) lg:has-[#sidebar-collapsed:checked]:grid-cols-[76px_1fr]">
       <a
         href="#main"
         className="sr-only z-50 rounded-field bg-signal px-4 py-3 font-semibold text-card focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
@@ -59,11 +64,11 @@ export function AppShell({
 
       <aside
         data-chrome
-        className="sticky top-0 hidden h-dvh flex-col gap-6 border-r border-rule bg-paper px-4 py-6 lg:flex"
+        className="sticky top-0 hidden h-dvh flex-col gap-6 overflow-x-hidden overflow-y-auto border-r border-rule bg-paper px-4 py-6 lg:flex"
       >
         <Link href={home} className="flex items-center gap-3 rounded-field px-2">
           <Mark />
-          <span className="grid leading-tight">
+          <span className="grid leading-tight whitespace-nowrap transition-opacity duration-200 group-has-[#sidebar-collapsed:checked]/shell:opacity-0">
             <span className="text-[16px] font-bold tracking-tight">{title}</span>
             <span className="text-[13px] text-ink-2">{t.app.office}</span>
           </span>
@@ -74,10 +79,16 @@ export function AppShell({
           ))}
         </nav>
         <div className="mt-auto grid gap-3">
-          <LangSwitch lang={lang} label={t.common.language} />
+          <SidebarToggle collapsed={sidebarCollapsed} label={t.nav.compact} />
+          <div className="group-has-[#sidebar-collapsed:checked]/shell:hidden">
+            <LangSwitch lang={lang} label={t.common.language} />
+          </div>
           <form action={logout}>
-            <button className="flex min-h-11 w-full items-center gap-3 rounded-field px-3 text-[15px] font-semibold text-ink-2 hover:bg-paper-deep hover:text-ink">
-              <Icon name="logout" size={20} />
+            <button
+              title={t.nav.logout}
+              className="flex min-h-11 w-full items-center gap-3 rounded-field px-3 text-[15px] font-semibold whitespace-nowrap text-ink-2 hover:bg-paper-deep hover:text-ink"
+            >
+              <Icon name="logout" size={20} className="shrink-0" />
               {t.nav.logout}
             </button>
           </form>
@@ -107,6 +118,7 @@ export function AppShell({
           {children}
         </main>
         <TourHost t={t.tour} isPractice={isPractice} />
+        <NavTrail />
 
         <nav
           data-chrome

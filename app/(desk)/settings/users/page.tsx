@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { Saved } from "@/components/domain/Saved";
 import { ButtonLink } from "@/components/ui/Button";
 import { PageHead } from "@/components/ui/PageHead";
 import { Pill } from "@/components/ui/Pill";
@@ -12,11 +13,17 @@ import { listUsers } from "@/server/queries/users";
 
 export const metadata: Metadata = { title: "Users" };
 
-export default async function UsersPage() {
+export default async function UsersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ saved?: string }>;
+}) {
+  const { saved } = await searchParams;
   await requireAccess("users.manage");
   const [t, rows] = await Promise.all([getT(), listUsers()]);
   return (
     <>
+      <Saved show={saved === "1"} label={t.common.saved} />
       <PageHead
         back={{ href: "/settings", label: t.settings.title }}
         title={t.users.title}

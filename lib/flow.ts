@@ -12,7 +12,11 @@ import type { ChallanStatus, TripStatus } from "@/lib/types";
 export const FLOW = ["book", "load", "road", "deliver", "collect"] as const;
 export type FlowStage = (typeof FLOW)[number];
 
-export type TripAction = "dispatch" | "arrive" | "deliver" | "close";
+/**
+ * "load", "deliver" and "collect" point at work done row by row below the card; the others
+ * are one button on the trip.
+ */
+export type TripAction = "load" | "dispatch" | "arrive" | "deliver" | "close" | "collect";
 
 /** Where a trip sits on the flow. */
 export function tripStage(status: TripStatus): FlowStage {
@@ -22,16 +26,22 @@ export function tripStage(status: TripStatus): FlowStage {
   return "collect";
 }
 
-/** The single next action on a trip, or null when it is closed. */
-export function tripNextAction(status: TripStatus, undelivered: number): TripAction | null {
-  if (status === "loading") return "dispatch";
+/**
+ * The single next action on a trip: load before it can leave, deliver before it can close,
+ * and collect what is still owed after closing. Null when nothing is left to do.
+ */
+export function tripNextAction(
+  status: TripStatus,
+  on: { loaded: number; undelivered: number; due: number },
+): TripAction | null {
+  if (status === "loading") return on.loaded > 0 ? "dispatch" : "load";
   if (status === "in_transit") return "arrive";
-  if (status === "arrived") return undelivered > 0 ? "deliver" : "close";
-  return null;
+  if (status === "arrived") return on.undelivered > 0 ? "deliver" : "close";
+  return on.due > 0 ? "collect" : null;
 }
 
 /** Status a trip moves to for an action (deliver happens per parcel, not on the trip). */
-export const TRIP_ACTION_TO: Record<Exclude<TripAction, "deliver">, TripStatus> = {
+export const TRIP_ACTION_TO: Record<Exclude<TripAction, "load" | "deliver" | "collect">, TripStatus> = {
   dispatch: "in_transit",
   arrive: "arrived",
   close: "closed",

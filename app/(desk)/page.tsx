@@ -47,6 +47,12 @@ export default async function HomePage() {
         icon: "rupee",
         need: "payments.record",
       },
+      {
+        href: "/salary/advances",
+        label: t.salary.giveAdvance,
+        icon: "idCard",
+        need: "advances.record",
+      },
       { href: "/salary", label: t.nav.salary, icon: "idCard", need: "salary.view" },
       { href: "/reports", label: t.nav.reports, icon: "chart", need: "reports.view" },
     ] satisfies { href: string; label: string; icon: IconName; need: Permission }[]

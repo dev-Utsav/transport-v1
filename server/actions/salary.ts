@@ -1,7 +1,7 @@
 "use server";
 
 import { and, eq } from "drizzle-orm";
-import { redirect } from "next/navigation";
+import { redirect, RedirectType } from "next/navigation";
 import { z } from "zod";
 
 import { daysInMonth } from "@/lib/dates";
@@ -14,6 +14,7 @@ import { getDb } from "@/server/db";
 import { salaryMonths, staff } from "@/server/db/schema";
 import { assertCan } from "@/server/auth";
 import { guardForm, refreshDesk } from "@/server/guard";
+import { advanceOwedFor } from "@/server/queries/salary";
 
 const entrySchema = z
   .object({
@@ -22,7 +23,6 @@ const entrySchema = z
     present: zf.count,
     absent: zf.count,
     halfDays: zf.count,
-    advance: zf.money,
     deduction: zf.money,
     note: zf.optionalText,
     markPaid: z.enum(["yes", "no"]).default("no"),
@@ -39,7 +39,11 @@ const entrySchema = z
       ctx.addIssue({ code: "custom", path: ["paidOn"], message: "required" });
   });
 
-/** Saves attendance, advances and deductions; optionally marks the net as paid in the same step. */
+/**
+ * Saves attendance and deductions; optionally marks the net as paid in the same step. Advances
+ * aren't typed here: what is owed comes from the khata, and the amount this month takes off is
+ * stored (`advance`), so later months know what is still owed.
+ */
 export async function saveSalaryEntry(_prev: FormState, formData: FormData): Promise<FormState> {
   return guardForm(formData, async () => {
     await assertCan("salary.manage");
@@ -57,7 +61,11 @@ export async function saveSalaryEntry(_prev: FormState, formData: FormData): Pro
         .where(and(eq(salaryMonths.staffId, entry.staffId), eq(salaryMonths.month, entry.month)));
       // Salary is frozen per month: an existing entry keeps the rate it was made with.
       const monthlySalary = before?.monthlySalary ?? employee.monthlySalary;
-      const net = calcSalary({ ...entry, monthlySalary }).net;
+      // A paid month is frozen: re-saving its note never changes what was taken off.
+      const { owed } = before?.paidOn
+        ? { owed: before.advance }
+        : await advanceOwedFor(tx, entry.staffId, entry.month);
+      const { net, advanceCut } = calcSalary({ ...entry, monthlySalary, advance: owed });
       const paid =
         markPaid === "yes" && paidMode && paidOn
           ? { paidMode, paidOn, paidAmount: net }
@@ -66,7 +74,7 @@ export async function saveSalaryEntry(_prev: FormState, formData: FormData): Pro
               paidOn: before?.paidOn ?? null,
               paidAmount: before?.paidAmount ?? null,
             };
-      const row = { ...entry, monthlySalary, ...paid };
+      const row = { ...entry, monthlySalary, advance: advanceCut, ...paid };
       const [after] = before
         ? await tx.update(salaryMonths).set(row).where(eq(salaryMonths.id, before.id)).returning()
         : await tx.insert(salaryMonths).values(row).returning();
@@ -81,6 +89,6 @@ export async function saveSalaryEntry(_prev: FormState, formData: FormData): Pro
         );
     });
     refreshDesk();
-    redirect(`/salary?month=${entry.month}&saved=1`);
+    redirect(`/salary?month=${entry.month}&saved=1`, RedirectType.replace);
   });
 }

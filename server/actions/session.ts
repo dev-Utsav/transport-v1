@@ -2,7 +2,7 @@
 
 import { eq, sql } from "drizzle-orm";
 import { cookies, headers } from "next/headers";
-import { redirect } from "next/navigation";
+import { redirect, RedirectType } from "next/navigation";
 import { z } from "zod";
 
 import { hashPassword, verifyPassword } from "@/lib/password";
@@ -92,7 +92,10 @@ export async function login(_prev: LoginState, formData: FormData): Promise<Logi
 
   await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
   await startSession(user);
-  redirect(user.mustChangePassword ? "/account/password" : nextPath.parse(formData.get("next")));
+  redirect(
+    user.mustChangePassword ? "/account/password" : nextPath.parse(formData.get("next")),
+    RedirectType.replace,
+  );
 }
 
 const setupSchema = z.object({
@@ -136,7 +139,7 @@ export async function setupFirstAdmin(_prev: SetupState, formData: FormData): Pr
   });
   if (!created) return { error: "done" };
   await startSession(created);
-  redirect("/");
+  redirect("/", RedirectType.replace);
 }
 
 const changeSchema = z.object({
@@ -151,7 +154,7 @@ export async function changePassword(
   formData: FormData,
 ): Promise<PasswordState> {
   const actor = await getActor();
-  if (!actor) redirect("/login");
+  if (!actor) redirect("/login", RedirectType.replace);
   const parsed = changeSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: "password" };
   const { current, password, confirm } = parsed.data;
@@ -175,12 +178,12 @@ export async function changePassword(
     return row;
   });
   if (updated) await startSession(updated);
-  redirect("/");
+  redirect("/", RedirectType.replace);
 }
 
 export async function logout(): Promise<void> {
   (await cookies()).delete(SESSION_COOKIE);
-  redirect("/login");
+  redirect("/login", RedirectType.replace);
 }
 
 export async function setLang(formData: FormData): Promise<void> {
@@ -190,7 +193,7 @@ export async function setLang(formData: FormData): Promise<void> {
     maxAge: 365 * 24 * 60 * 60,
     sameSite: "lax",
   });
-  redirect(await samePageBack());
+  redirect(await samePageBack(), RedirectType.replace);
 }
 
 /** Back to the page the form was on (from Referer), only if it is on this site. */

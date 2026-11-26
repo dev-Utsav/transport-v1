@@ -1,0 +1,7 @@
+# Never upload local secrets or local databases with a CLI deploy
+.env*
+!.env.example
+.data
+.next
+node_modules
+tsconfig.tsbuildinfo

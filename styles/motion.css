@@ -1,0 +1,62 @@
+/*
+ * Motion: CSS only (no library). Only transform and opacity animate (plus height on <details>,
+ * which browsers without ::details-content simply open at once). Reduced motion is honoured in
+ * base.css, which shortens every transition and animation to nothing.
+ */
+@layer base {
+  :root {
+    interpolate-size: allow-keywords;
+  }
+
+  /* A new screen settles in: app/(desk)/template.tsx remounts on every navigation. */
+  @keyframes page-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
+  [data-page] {
+    animation: page-in 220ms var(--ease-out) both;
+  }
+
+  /* Open / close panels: Correct the status, Mark as paid, Cancel, History. */
+  details::details-content {
+    block-size: 0;
+    overflow: clip;
+    opacity: 0;
+    transition:
+      block-size 220ms var(--ease-out),
+      opacity 180ms var(--ease-out),
+      content-visibility 220ms allow-discrete;
+  }
+  details[open]::details-content {
+    block-size: auto;
+    opacity: 1;
+  }
+  summary {
+    list-style-position: outside;
+  }
+
+  /* Messages that appear (Saved, errors) fade up instead of jumping in. */
+  [role="status"] > *,
+  [role="alert"] > * {
+    transition:
+      opacity 200ms var(--ease-out),
+      transform 200ms var(--ease-out);
+    @starting-style {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+  }
+
+  /* Buttons and big tap targets give under the thumb. */
+  button,
+  a[class*="rounded"] {
+    transition-property: color, background-color, box-shadow, transform, opacity;
+    transition-duration: 150ms;
+  }
+  button:active:not(:disabled),
+  a[class*="rounded"]:active {
+    transform: scale(0.98);
+  }
+}

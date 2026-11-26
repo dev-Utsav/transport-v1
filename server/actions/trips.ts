@@ -1,9 +1,10 @@
 "use server";
 
 import { and, eq, inArray, isNull } from "drizzle-orm";
-import { redirect } from "next/navigation";
+import { redirect, RedirectType } from "next/navigation";
 import { z } from "zod";
 
+import { istDay } from "@/lib/dates";
 import { failed, formValues, zf } from "@/lib/form";
 import type { FormState } from "@/lib/form";
 import { TRIP_STATUSES } from "@/lib/types";
@@ -77,7 +78,7 @@ export async function saveTrip(_prev: FormState, formData: FormData): Promise<Fo
       return created.id;
     });
     refreshDesk();
-    redirect(`/trips/${savedId}`);
+    redirect(`/trips/${savedId}?saved=1`, RedirectType.replace);
   });
 }
 
@@ -99,7 +100,14 @@ export async function setTripStatus(formData: FormData): Promise<void> {
   await db.transaction(async (tx) => {
     const [before] = await tx.select().from(trips).where(eq(trips.id, id));
     if (!before || before.status === status) return;
-    const [after] = await tx.update(trips).set({ status }).where(eq(trips.id, id)).returning();
+    // Arrival day stays as first marked; moving the trip back before arrival clears it.
+    const arrivedOn =
+      status === "arrived" || status === "closed" ? (before.arrivedOn ?? istDay()) : null;
+    const [after] = await tx
+      .update(trips)
+      .set({ status, arrivedOn })
+      .where(eq(trips.id, id))
+      .returning();
     await logChange(tx, "trip", id, "update", { status: before.status }, { status: after?.status });
     const rule = CASCADE[status];
     if (rule) {

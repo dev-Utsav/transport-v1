@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { Saved } from "@/components/domain/Saved";
 import { MasterRow } from "@/components/domain/MasterRow";
 import { DriverForm } from "@/components/forms/MasterForms";
 import { PageHead, Section } from "@/components/ui/PageHead";
@@ -13,14 +14,15 @@ export const metadata: Metadata = { title: "Drivers" };
 export default async function DriversPage({
   searchParams,
 }: {
-  searchParams: Promise<{ edit?: string }>;
+  searchParams: Promise<{ edit?: string; saved?: string }>;
 }) {
   await requireAccess("masters.manage");
-  const { edit } = await searchParams;
+  const { edit, saved } = await searchParams;
   const [t, drivers] = await Promise.all([getT(), driverOptions(true)]);
   const editing = drivers.find((d) => String(d.id) === edit);
   return (
     <>
+      <Saved show={saved === "1"} label={t.common.saved} />
       <PageHead back={{ href: "/settings", label: t.settings.title }} title={t.settings.drivers} />
       <div className="grid max-w-2xl gap-8">
         <Section title={editing ? `${t.common.edit} · ${editing.name}` : t.settings.newDriver}>

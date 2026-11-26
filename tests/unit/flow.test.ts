@@ -4,11 +4,16 @@ import { challanNext, sortForTruck, tripNextAction, tripStage } from "@/lib/flow
 
 describe("trip flow", () => {
   it("offers one next action per status", () => {
-    expect(tripNextAction("loading", 3)).toBe("dispatch");
-    expect(tripNextAction("in_transit", 3)).toBe("arrive");
-    expect(tripNextAction("arrived", 2)).toBe("deliver");
-    expect(tripNextAction("arrived", 0)).toBe("close");
-    expect(tripNextAction("closed", 0)).toBeNull();
+    const on = { loaded: 3, undelivered: 3, due: 0 };
+    expect(tripNextAction("loading", on)).toBe("dispatch");
+    expect(tripNextAction("in_transit", on)).toBe("arrive");
+    expect(tripNextAction("arrived", { ...on, undelivered: 2 })).toBe("deliver");
+    expect(tripNextAction("arrived", { ...on, undelivered: 0 })).toBe("close");
+    expect(tripNextAction("closed", { ...on, undelivered: 0 })).toBeNull();
+  });
+  it("asks to load before the truck can leave, and to collect after it closes", () => {
+    expect(tripNextAction("loading", { loaded: 0, undelivered: 0, due: 0 })).toBe("load");
+    expect(tripNextAction("closed", { loaded: 3, undelivered: 0, due: 2990000 })).toBe("collect");
   });
   it("maps statuses to stages", () => {
     expect(tripStage("loading")).toBe("load");

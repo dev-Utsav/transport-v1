@@ -62,7 +62,7 @@ export default async function SalaryRegisterPage({
                       {pay.paidDays}/{pay.totalDays}
                     </td>
                     <td className="py-2 pr-2 text-right">{formatAmount(pay.earned)}</td>
-                    <td className="py-2 pr-2 text-right">{formatAmount(entry.advance)}</td>
+                    <td className="py-2 pr-2 text-right">{formatAmount(pay.advanceCut)}</td>
                     <td className="py-2 pr-2 text-right">{formatAmount(entry.deduction)}</td>
                     <td className="py-2 pr-2 text-right font-semibold">{formatAmount(pay.net)}</td>
                     <td className="py-2">

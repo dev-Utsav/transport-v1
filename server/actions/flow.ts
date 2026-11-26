@@ -1,7 +1,7 @@
 "use server";
 
 import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
-import { redirect } from "next/navigation";
+import { redirect, RedirectType } from "next/navigation";
 import { z } from "zod";
 
 import { istDay } from "@/lib/dates";
@@ -51,7 +51,7 @@ export async function loadOnTrip(formData: FormData): Promise<void> {
     });
   }
   refreshDesk();
-  redirect(`/trips/${tripId}`);
+  redirect(`/trips/${tripId}`, RedirectType.replace);
 }
 
 /** Takes a parcel back off a truck that hasn't left yet. */
@@ -79,7 +79,7 @@ export async function unloadFromTrip(formData: FormData): Promise<void> {
     );
   });
   refreshDesk();
-  redirect(tripId ? `/trips/${tripId}` : `/challans/${id}`);
+  redirect(tripId ? `/trips/${tripId}` : `/challans/${id}`, RedirectType.replace);
 }
 
 /**
@@ -96,9 +96,19 @@ export async function advanceTrip(formData: FormData): Promise<void> {
   const scope = tripScope(actor);
   const db = await getDb();
   await db.transaction(async (tx) => {
+    // An empty truck can't leave: load first (the screen says so; this is the server's check).
+    if (action === "dispatch") {
+      const [onTruck] = await tx
+        .select({ id: challans.id })
+        .from(challans)
+        .where(and(eq(challans.tripId, id), eq(challans.isCancelled, false)))
+        .limit(1);
+      if (!onTruck) return;
+    }
     const moved = await tx
       .update(trips)
-      .set({ status: to })
+      // Arrival day is what on-time scores are measured by.
+      .set(action === "arrive" ? { status: to, arrivedOn: istDay() } : { status: to })
       .where(
         and(
           eq(trips.id, id),
@@ -124,7 +134,7 @@ export async function advanceTrip(formData: FormData): Promise<void> {
     }
   });
   refreshDesk();
-  redirect(`/trips/${id}`);
+  redirect(`/trips/${id}`, RedirectType.replace);
 }
 
 /**
@@ -185,5 +195,5 @@ export async function deliverChallan(formData: FormData): Promise<void> {
     if (p) await logChange(tx, "payment", p.id, "create", null, p);
   });
   refreshDesk();
-  redirect(back ?? `/challans/${id}`);
+  redirect(back ?? `/challans/${id}`, RedirectType.replace);
 }

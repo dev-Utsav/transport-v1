@@ -10,6 +10,7 @@ import {
   payments,
   salaryMonths,
   staff,
+  staffAdvances,
   trips,
   trucks,
   vendors,
@@ -17,14 +18,19 @@ import {
 import { countInt, orZero, sumInt } from "@/server/queries/sql";
 import { getSettings } from "@/server/settings";
 
-/** Cash book for one day: opening (everything in cash before it), cash in, cash out, closing. */
+/**
+ * Cash book for one day: opening (everything in cash before it), cash in, cash out, closing.
+ * Cash out = expenses + salaries paid + advances given (salary is paid net of advances).
+ */
 export async function cashBook(day: string) {
   const db = await getDb();
   const settings = await getSettings();
   const cashPay = and(eq(payments.mode, "cash"), eq(payments.isCancelled, false));
   const cashExp = and(eq(expenses.mode, "cash"), eq(expenses.isCancelled, false));
   const cashSal = eq(salaryMonths.paidMode, "cash");
-  const [[inBefore], [outBefore], [salBefore], ins, outs, sals] = await Promise.all([
+  const cashAdv = and(eq(staffAdvances.mode, "cash"), eq(staffAdvances.isCancelled, false));
+  const [[inBefore], [outBefore], [salBefore], [advBefore], ins, outs, sals, advs] =
+    await Promise.all([
     db
       .select({ v: sumInt(payments.amount) })
       .from(payments)
@@ -37,6 +43,10 @@ export async function cashBook(day: string) {
       .select({ v: sumInt(salaryMonths.paidAmount) })
       .from(salaryMonths)
       .where(and(cashSal, lt(salaryMonths.paidOn, day))),
+    db
+      .select({ v: sumInt(staffAdvances.amount) })
+      .from(staffAdvances)
+      .where(and(cashAdv, lt(staffAdvances.givenOn, day))),
     db
       .select({ id: payments.id, amount: payments.amount, name: vendors.name, note: payments.note })
       .from(payments)
@@ -62,12 +72,22 @@ export async function cashBook(day: string) {
       .from(salaryMonths)
       .innerJoin(staff, eq(staff.id, salaryMonths.staffId))
       .where(and(cashSal, eq(salaryMonths.paidOn, day))),
+    db
+      .select({ id: staffAdvances.id, amount: staffAdvances.amount, name: staff.name })
+      .from(staffAdvances)
+      .innerJoin(staff, eq(staff.id, staffAdvances.staffId))
+      .where(and(cashAdv, eq(staffAdvances.givenOn, day)))
+      .orderBy(staffAdvances.id),
   ]);
   const opening =
-    settings.openingCash + (inBefore?.v ?? 0) - (outBefore?.v ?? 0) - (salBefore?.v ?? 0);
+    settings.openingCash +
+    (inBefore?.v ?? 0) -
+    (outBefore?.v ?? 0) -
+    (salBefore?.v ?? 0) -
+    (advBefore?.v ?? 0);
   const cashIn = ins.reduce((s, r) => s + r.amount, 0);
-  const cashOut = outs.reduce((s, r) => s + r.amount, 0) + sals.reduce((s, r) => s + r.amount, 0);
-  return { opening, cashIn, cashOut, closing: opening + cashIn - cashOut, ins, outs, sals };
+  const cashOut = [...outs, ...sals, ...advs].reduce((s, r) => s + r.amount, 0);
+  return { opening, cashIn, cashOut, closing: opening + cashIn - cashOut, ins, outs, sals, advs };
 }
 
 /** Trips that left in the month: freight on the truck minus expenses tied to the trip. */

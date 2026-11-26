@@ -8,6 +8,7 @@ import { PeriodNav } from "@/components/ui/PeriodNav";
 import { Pill } from "@/components/ui/Pill";
 import { Empty, RowList, RowLink } from "@/components/ui/Rows";
 import { formatMonth, istMonth, isMonth, shiftMonth } from "@/lib/dates";
+import { formatMoney } from "@/lib/money";
 import { requireAccess } from "@/server/auth";
 import { getT } from "@/server/lang";
 import { salaryRegister } from "@/server/queries/salary";
@@ -37,6 +38,9 @@ export default async function SalaryPage({
         }
         actions={
           <>
+            <ButtonLink href="/salary/advances" variant="secondary" icon="rupee">
+              {t.salary.advances}
+            </ButtonLink>
             <ButtonLink href={`/salary/register?month=${month}`} variant="secondary" icon="print">
               {t.salary.register}
             </ButtonLink>
@@ -63,7 +67,7 @@ export default async function SalaryPage({
         />
         {rows.length ? (
           <RowList>
-            {rows.map(({ employee, entry, pay }) => (
+            {rows.map(({ employee, entry, pay, advanceOwed }) => (
               <RowLink
                 key={employee.id}
                 href={`/salary/${employee.id}?month=${month}`}
@@ -72,7 +76,10 @@ export default async function SalaryPage({
                 meta={[
                   t.roles[employee.role],
                   pay ? `${t.salary.paidDays}: ${pay.paidDays}/${pay.totalDays}` : t.salary.entry,
-                ].join(" · ")}
+                  advanceOwed > 0 ? `${t.salary.owed}: ${formatMoney(advanceOwed)}` : "",
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
                 aside={pay ? <Money paise={pay.net} /> : "—"}
                 asideSub={
                   entry?.paidOn ? (

@@ -6,4 +6,5 @@ export type TripCan = {
   deliver: boolean;
   openChallans: boolean;
   openParties: boolean;
+  takePayment: boolean;
 };

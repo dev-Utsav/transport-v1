@@ -109,6 +109,8 @@ export const trips = pgTable(
     departOn: date("depart_on").notNull(),
     expectedOn: date("expected_on"),
     status: text("status").$type<TripStatus>().notNull().default("loading"),
+    // IST day the truck was marked arrived (set by the status change; on-time = arrivedOn <= expectedOn).
+    arrivedOn: date("arrived_on"),
     note: text("note").notNull().default(""),
     createdAt: createdAt(),
   },
@@ -243,6 +245,32 @@ export const salaryMonths = pgTable(
     paidAmount: integer("paid_amount"),
   },
   (t) => [uniqueIndex("salary_staff_month_idx").on(t.staffId, t.month)],
+);
+
+/**
+ * Cash advances to staff (the khata): many small amounts, any day. Never edited, only cancelled.
+ * Each month's salary takes off what is owed (advances given up to the month's end minus what
+ * earlier months already took off, `salary_months.advance`); what the pay can't cover carries on.
+ */
+export const staffAdvances = pgTable(
+  "staff_advances",
+  {
+    id: serial("id").primaryKey(),
+    staffId: integer("staff_id")
+      .notNull()
+      .references(() => staff.id),
+    givenOn: date("given_on").notNull(),
+    amount: integer("amount").notNull(),
+    mode: text("mode").$type<PayMode>().notNull(),
+    note: text("note").notNull().default(""),
+    isCancelled: boolean("is_cancelled").notNull().default(false),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("staff_advances_staff_idx").on(t.staffId, t.givenOn),
+    index("staff_advances_given_idx").on(t.givenOn),
+    check("staff_advances_amount_check", sql`${t.amount} > 0`),
+  ],
 );
 
 /* ---------- Access: users, roles, permissions (RBAC) ----------

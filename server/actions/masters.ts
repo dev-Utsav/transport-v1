@@ -1,7 +1,7 @@
 "use server";
 
 import { eq } from "drizzle-orm";
-import { redirect } from "next/navigation";
+import { redirect, RedirectType } from "next/navigation";
 import { z } from "zod";
 
 import { failed, formValues, zf } from "@/lib/form";
@@ -62,7 +62,7 @@ export async function saveTruck(_prev: FormState, formData: FormData): Promise<F
       if (created) await logChange(tx, "truck", created.id, "create", null, created);
     });
     refreshDesk();
-    redirect("/settings/trucks");
+    redirect("/settings/trucks?saved=1", RedirectType.replace);
   });
 }
 
@@ -89,7 +89,7 @@ export async function saveDriver(_prev: FormState, formData: FormData): Promise<
       if (created) await logChange(tx, "staff", created.id, "create", null, created);
     });
     refreshDesk();
-    redirect("/settings/drivers");
+    redirect("/settings/drivers?saved=1", RedirectType.replace);
   });
 }
 
@@ -116,7 +116,7 @@ export async function saveEmployee(_prev: FormState, formData: FormData): Promis
       return created.id;
     });
     refreshDesk();
-    redirect(id ? `/salary/${staffId}` : "/salary");
+    redirect(id ? `/salary/${staffId}?saved=1` : "/salary?saved=1", RedirectType.replace);
   });
 }
 

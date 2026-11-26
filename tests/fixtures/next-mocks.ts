@@ -30,6 +30,7 @@ vi.mock("next/cache", () => ({ revalidatePath: () => {}, revalidateTag: () => {}
 vi.mock("next/navigation", async () => {
   const { NotFoundSignal, RedirectSignal } = await import("@/tests/fixtures/signals");
   return {
+    RedirectType: { push: "push", replace: "replace" },
     redirect: (url: string) => {
       throw new RedirectSignal(url);
     },

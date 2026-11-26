@@ -1,7 +1,7 @@
 "use server";
 
 import { eq } from "drizzle-orm";
-import { redirect } from "next/navigation";
+import { redirect, RedirectType } from "next/navigation";
 import { z } from "zod";
 
 import { failed, formValues, zf } from "@/lib/form";
@@ -62,7 +62,7 @@ export async function saveSettings(_prev: FormState, formData: FormData): Promis
     });
     if (result === "backwards") return { ok: false, errors: { nextChallanNo: "invalid" }, values };
     refreshDesk();
-    redirect("/settings?saved=1");
+    redirect("/settings?saved=1", RedirectType.replace);
   });
 }
 

@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { Money } from "@/components/domain/Money";
 import { RemindButton } from "@/components/domain/RemindButton";
+import { ButtonLink } from "@/components/ui/Button";
 import { COLLECT_TONE, Pill } from "@/components/ui/Pill";
 import type { Strings } from "@/content/strings";
 import { fill } from "@/content/strings";
@@ -49,7 +50,7 @@ export function TripLoadList({
           className="overflow-hidden rounded-card bg-card shadow-card ring-1 ring-rule"
         >
           <header className="flex flex-wrap items-center gap-3 border-b border-rule bg-paper/60 px-4 py-3 sm:px-5">
-            <PartyLink href={`/vendors/${g.partyId}`} className="min-w-0 flex-1">
+            <PartyLink href={`/vendors/${g.partyId}`} className="min-w-[12rem] flex-1">
               <h3 className="truncate text-[17px] font-bold">{g.name}</h3>
               <p className="text-[14px] text-ink-2">
                 <span className="num">{g.packages}</span> {t.trips.packages} ·{" "}
@@ -64,6 +65,15 @@ export function TripLoadList({
             </PartyLink>
             {g.due > 0 && g.phone && status !== "loading" ? (
               <RemindButton t={t} name={g.name} phone={g.phone} balance={g.due} compact />
+            ) : null}
+            {g.due > 0 && can.takePayment && status === "closed" ? (
+              <ButtonLink
+                href={`/payments/new?vendor=${g.partyId}&trip=${detail.trip.id}`}
+                variant="secondary"
+                icon="rupee"
+              >
+                {t.tripFlow.takePayment}
+              </ButtonLink>
             ) : null}
           </header>
           <ul className="divide-y divide-rule">

@@ -1,7 +1,7 @@
 "use server";
 
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
+import { redirect, RedirectType } from "next/navigation";
 
 import { getPracticeDb } from "@/server/db";
 import { resetSample } from "@/server/db/sample";
@@ -18,17 +18,17 @@ export async function startPractice(formData: FormData): Promise<void> {
     httpOnly: true,
     maxAge: 12 * 60 * 60,
   });
-  redirect(formData.get("tour") === "1" ? "/?tour=start" : "/");
+  redirect(formData.get("tour") === "1" ? "/?tour=start" : "/", RedirectType.replace);
 }
 
 export async function resetPractice(): Promise<void> {
   await assertCan();
   await resetSample(await getPracticeDb());
-  redirect("/");
+  redirect("/", RedirectType.replace);
 }
 
 export async function leavePractice(): Promise<void> {
   await assertCan();
   (await cookies()).delete(PRACTICE_COOKIE);
-  redirect("/");
+  redirect("/", RedirectType.replace);
 }

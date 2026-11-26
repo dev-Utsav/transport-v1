@@ -38,8 +38,11 @@ export function PaymentForm({
   const [amount, setAmount] = useState(v("amount"));
 
   function onPartyChange(event: React.ChangeEvent<HTMLSelectElement>) {
-    // Reload with the party so its open challans and balance come from the server.
-    const params = new URLSearchParams({ vendor: event.target.value });
+    // Reload with the party so its open challans and balance come from the server; keep where
+    // the payment was started from (trip, mode).
+    const params = new URLSearchParams(window.location.search);
+    params.set("vendor", event.target.value);
+    params.delete("challan");
     router.push(`/payments/new?${params.toString()}`);
   }
 

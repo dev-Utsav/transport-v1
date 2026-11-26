@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { Saved } from "@/components/domain/Saved";
 import { ResetPasswordForm, ToggleUserForm } from "@/components/forms/UserAdminForms";
 import { UserForm } from "@/components/forms/UserForm";
 import { PageHead, Section } from "@/components/ui/PageHead";
@@ -10,7 +11,14 @@ import { getUser, roleOptions, staffForLogins } from "@/server/queries/users";
 
 export const metadata: Metadata = { title: "Edit user" };
 
-export default async function EditUserPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function EditUserPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ saved?: string }>;
+}) {
+  const { saved } = await searchParams;
   await requireAccess("users.manage");
   const id = Number((await params).id);
   const [t, user, roles, staff] = await Promise.all([
@@ -22,6 +30,7 @@ export default async function EditUserPage({ params }: { params: Promise<{ id: s
   if (!user) notFound();
   return (
     <>
+      <Saved show={saved === "1"} label={t.common.saved} />
       <PageHead back={{ href: "/settings/users", label: t.users.title }} title={user.name} />
       <div className="grid max-w-xl gap-10">
         <UserForm

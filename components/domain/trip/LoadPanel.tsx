@@ -29,7 +29,12 @@ export function LoadPanel({
   const target = toPlace.trim().toLowerCase();
   const firstOther = sorted.findIndex((w) => w.toPlace.trim().toLowerCase() !== target);
   return (
-    <section className="grid gap-3" aria-labelledby="load-title" data-no-print>
+    <section
+      id="load"
+      className="grid scroll-mt-20 gap-3"
+      aria-labelledby="load-title"
+      data-no-print
+    >
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <h2 id="load-title" className="text-[18px] font-bold tracking-tight">

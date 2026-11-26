@@ -30,6 +30,8 @@ export const PERMISSIONS = [
   "expenses.cancel",
   "salary.view",
   "salary.manage",
+  "advances.record", // cash advance to a worker (taken off their salary)
+  "advances.cancel",
   "gst.view",
   "reports.view",
   "reports.export",
@@ -77,6 +79,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     "payments.record",
     "expenses.view",
     "expenses.record",
+    "advances.record",
     "gst.view",
     "reports.view",
     "reports.export",

@@ -104,8 +104,13 @@ async function postgresDb(url: string, pgSchema: "public" | "practice"): Promise
   const postgres = (await import("postgres")).default;
   const client = postgres(url, {
     prepare: false,
-    max: 3,
-    idle_timeout: 5,
+    // Real desk: up to 5 connections, kept open (no idle close) so requests skip the pooler
+    // handshake. Practice is used rarely: 2. Supabase's session pooler allows ~15 clients in all
+    // (per project, across every Vercel instance), so raise these only with a bigger plan.
+    max: pgSchema === "public" ? 5 : 2,
+    idle_timeout: 0,
+    // Recycle each connection every 30 min so a pooler restart never leaves a dead socket for long.
+    max_lifetime: 60 * 30,
     connect_timeout: 10,
     connection: {
       statement_timeout: 15_000,

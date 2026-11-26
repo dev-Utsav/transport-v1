@@ -18,10 +18,11 @@ export const metadata: Metadata = { title: "Record payment" };
 export default async function NewPaymentPage({
   searchParams,
 }: {
-  searchParams: Promise<{ vendor?: string; challan?: string; mode?: string }>;
+  searchParams: Promise<{ vendor?: string; challan?: string; mode?: string; trip?: string }>;
 }) {
   await requireAccess("payments.record");
-  const { vendor, challan, mode } = await searchParams;
+  const { vendor, challan, mode, trip } = await searchParams;
+  const tripId = Number(trip) || 0;
   const vendorId = Number(vendor) || 0;
   const [t, settings, parties, open, balance] = await Promise.all([
     getT(),
@@ -31,13 +32,18 @@ export default async function NewPaymentPage({
     vendorId ? getVendorBalance(vendorId) : Promise.resolve(null),
   ]);
   const picked = open.find((c) => String(c.id) === challan);
-  const back = challan ? `/challans/${challan}?saved=1` : "";
+  // Opened from a challan or a closed trip: go back there once the money is in.
+  const back = challan ? `/challans/${challan}?saved=1` : tripId ? `/trips/${tripId}?saved=1` : "";
   return (
     <>
       <FlowBar t={t} current="collect" />
       <PageHead
         title={t.payments.new}
-        back={{ href: balance ? `/vendors/${vendorId}` : "/", label: balance?.name ?? t.nav.home }}
+        back={
+          tripId
+            ? { href: `/trips/${tripId}`, label: t.trips.title }
+            : { href: balance ? `/vendors/${vendorId}` : "/", label: balance?.name ?? t.nav.home }
+        }
       />
       <PaymentForm
         key={`${vendorId}-${challan ?? ""}`}

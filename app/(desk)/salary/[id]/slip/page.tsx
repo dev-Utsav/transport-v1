@@ -6,11 +6,10 @@ import { PageHead } from "@/components/ui/PageHead";
 import { PrintButton } from "@/components/ui/PrintButton";
 import { formatDayFull, formatMonth, istMonth, isMonth } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
-import { calcSalary } from "@/lib/salary";
 import { amountInWords } from "@/lib/words";
 import { requireAccess } from "@/server/auth";
 import { getT } from "@/server/lang";
-import { getEmployee, getSalaryEntry } from "@/server/queries/salary";
+import { getAdvanceOwed, getEmployee, getSalaryEntry, payFor } from "@/server/queries/salary";
 import { getSettings } from "@/server/settings";
 
 export const metadata: Metadata = { title: "Salary slip" };
@@ -26,14 +25,15 @@ export default async function SalarySlipPage({
   const id = Number((await params).id);
   const { month: m = "" } = await searchParams;
   const month = isMonth(m) ? m : istMonth();
-  const [t, settings, employee, entry] = await Promise.all([
+  const [t, settings, employee, entry, advance] = await Promise.all([
     getT(),
     getSettings(),
     getEmployee(id),
     getSalaryEntry(id, month),
+    getAdvanceOwed(id, month),
   ]);
   if (!employee || !entry) notFound();
-  const pay = calcSalary({ ...entry, month });
+  const pay = payFor(entry, month, advance.owed);
   const lines = [
     { label: t.salary.monthly, value: formatMoney(entry.monthlySalary) },
     {
@@ -44,8 +44,11 @@ export default async function SalarySlipPage({
       label: `${t.salary.paidDays} (${pay.paidDays} / ${pay.totalDays})`,
       value: formatMoney(pay.earned),
     },
-    { label: `− ${t.salary.advance}`, value: formatMoney(entry.advance) },
     { label: `− ${t.salary.deduction}`, value: formatMoney(entry.deduction) },
+    { label: `− ${t.salary.advance}`, value: formatMoney(pay.advanceCut) },
+    ...(pay.advanceCarried > 0
+      ? [{ label: t.salary.carried, value: formatMoney(pay.advanceCarried) }]
+      : []),
   ];
   return (
     <>
