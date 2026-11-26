@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { IntentLink } from "@/components/ui/IntentLink";
 
 import { Money } from "@/components/domain/Money";
 import { RemindButton } from "@/components/domain/RemindButton";
@@ -35,8 +35,8 @@ export function TripLoadList({
   can: TripCan;
 }) {
   // Without access to parties / challans the rows are plain text, not links to a closed door.
-  const PartyLink = can.openParties ? Link : "div";
-  const ChallanLink = can.openChallans ? Link : "div";
+  const PartyLink = can.openParties ? IntentLink : "div";
+  const ChallanLink = can.openChallans ? IntentLink : "div";
   const status = detail.trip.status;
   // The tour points at the first parcel still to deliver.
   const firstToDeliver = detail.groups

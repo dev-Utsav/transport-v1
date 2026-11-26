@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { IntentLink } from "@/components/ui/IntentLink";
 import { redirect } from "next/navigation";
 
 import { FlowBoard } from "@/components/domain/FlowBoard";
@@ -109,7 +109,7 @@ export default async function HomePage() {
             ))}
           </dl>
         </div>
-        <Link
+        <IntentLink
           href="/expenses"
           className="grid content-start gap-2 bg-road p-5 transition-colors duration-150 hover:bg-road-2"
         >
@@ -117,19 +117,19 @@ export default async function HomePage() {
           <span className="num text-[24px] leading-tight font-bold">
             <Money paise={money.spent} />
           </span>
-        </Link>
+        </IntentLink>
       </section>
 
       {onRoad.length ? (
         <Section
           title={t.home.trucks}
           action={
-            <Link
+            <IntentLink
               href="/trips"
-              className="text-[15px] font-semibold text-signal-ink hover:underline"
+              className="-my-3 py-3 text-[15px] font-semibold text-signal-ink hover:underline"
             >
               {t.common.showAll}
-            </Link>
+            </IntentLink>
           }
         >
           <RowList>
@@ -144,24 +144,24 @@ export default async function HomePage() {
         <Section
           title={t.home.overdue}
           action={
-            <Link
+            <IntentLink
               href="/vendors/reminders"
-              className="text-[15px] font-semibold text-signal-ink hover:underline"
+              className="-my-3 py-3 text-[15px] font-semibold text-signal-ink hover:underline"
             >
               {t.common.showAll}
-            </Link>
+            </IntentLink>
           }
         >
           <RowList>
             {overdue.slice(0, 5).map((v) => (
               <li key={v.id} className="flex items-center gap-3 px-4 py-3 sm:px-5">
-                <Link href={`/vendors/${v.id}`} className="min-w-0 flex-1">
+                <IntentLink href={`/vendors/${v.id}`} className="min-w-0 flex-1">
                   <div className="truncate text-[16px] font-semibold">{v.name}</div>
                   <div className="text-[14px] text-ink-2">
                     {t.vendors.pending}:{" "}
                     <Money paise={v.balance} tone="due" className="font-semibold" />
                   </div>
-                </Link>
+                </IntentLink>
                 {v.phone ? (
                   <RemindButton t={t} name={v.name} phone={v.phone} balance={v.balance} compact />
                 ) : null}
@@ -177,13 +177,13 @@ export default async function HomePage() {
           <ul className="grid grid-cols-2 gap-2 lg:grid-cols-4">
             {office.map((a) => (
               <li key={a.href}>
-                <Link
+                <IntentLink
                   href={a.href}
                   className="flex min-h-14 items-center gap-3 rounded-card bg-card px-4 text-[15px] font-semibold shadow-card ring-1 ring-rule hover:ring-rule-strong"
                 >
                   <Icon name={a.icon} size={22} className="text-signal" />
                   {a.label}
-                </Link>
+                </IntentLink>
               </li>
             ))}
           </ul>

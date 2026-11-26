@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { IntentLink } from "@/components/ui/IntentLink";
 import type { ReactNode } from "react";
 
 import type { Strings } from "@/content/strings";
@@ -32,12 +32,12 @@ export function MasterRow({
           {[meta, isActive ? "" : t.common.inactive].filter(Boolean).join(" · ")}
         </div>
       </div>
-      <Link
+      <IntentLink
         href={editHref}
         className="min-h-11 rounded-field px-3 py-2.5 text-[14px] font-semibold ring-1 ring-rule-strong hover:bg-paper"
       >
         {t.common.edit}
-      </Link>
+      </IntentLink>
       <form action={toggleMaster}>
         <input type="hidden" name="kind" value={kind} />
         <input type="hidden" name="id" value={id} />

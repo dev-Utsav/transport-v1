@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { IntentLink } from "@/components/ui/IntentLink";
 
 import { ReportActions } from "@/components/domain/ReportActions";
 import { ReportTable } from "@/components/domain/ReportTable";
@@ -39,9 +39,9 @@ export default async function GstPage({
         {settings.gstin ? null : (
           <p className="rounded-field bg-part-soft px-4 py-3 text-[15px] font-semibold text-part">
             {t.gst.noGstin}{" "}
-            <Link href="/settings" className="underline">
+            <IntentLink href="/settings" className="underline">
               {t.nav.settings}
-            </Link>
+            </IntentLink>
           </p>
         )}
         <PeriodNav

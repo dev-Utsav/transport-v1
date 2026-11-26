@@ -67,7 +67,7 @@ export default async function PerformancePage({
           <ScoreList t={t} rows={view === "drivers" ? cards.drivers : cards.owners} />
         )}
         {view === "trucks" ? null : (
-          <details className="rounded-card bg-card p-4 text-[15px] ring-1 ring-rule">
+          <details className="rounded-card bg-card px-4 text-[15px] ring-1 ring-rule open:pb-4">
             <summary className="cursor-pointer font-semibold">{r.howScore}</summary>
             <p className="mt-2 text-ink-2">{r.deliveryScoreHow}</p>
           </details>

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { IntentLink } from "@/components/ui/IntentLink";
 
 import { RouteRail } from "@/components/domain/RouteRail";
 import { Pill } from "@/components/ui/Pill";
@@ -13,7 +13,7 @@ const TONE = { loading: "part", in_transit: "signal", arrived: "in", closed: "ne
 export function TripRow({ trip, t }: { trip: TripListRow; t: Strings }) {
   return (
     <li>
-      <Link
+      <IntentLink
         href={`/trips/${trip.id}`}
         className="grid gap-3 px-4 py-4 transition-colors duration-150 hover:bg-paper sm:grid-cols-[1fr_1.4fr_auto] sm:items-center sm:gap-6 sm:px-5"
       >
@@ -39,7 +39,7 @@ export function TripRow({ trip, t }: { trip: TripListRow; t: Strings }) {
           </div>
           <div className="num text-[16px] font-semibold text-ink">{formatMoney(trip.freight)}</div>
         </div>
-      </Link>
+      </IntentLink>
     </li>
   );
 }

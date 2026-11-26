@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { IntentLink } from "@/components/ui/IntentLink";
 
 import { TourEntry } from "@/components/domain/TourEntry";
 import { allowedNav, mainNav } from "@/components/layout/nav";
@@ -30,14 +30,14 @@ export default async function MorePage() {
       <ul className="grid gap-2">
         {items.map((item) => (
           <li key={item.href}>
-            <Link
+            <IntentLink
               href={item.href}
               className="flex min-h-16 items-center gap-4 rounded-card bg-card px-5 text-[17px] font-semibold shadow-card ring-1 ring-rule hover:ring-rule-strong"
             >
               <Icon name={item.icon} size={24} className="text-signal" />
               <span className="flex-1">{item.label}</span>
               <Icon name="chevronRight" size={18} className="text-ink-3" />
-            </Link>
+            </IntentLink>
           </li>
         ))}
       </ul>

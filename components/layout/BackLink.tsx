@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { IntentLink } from "@/components/ui/IntentLink";
 import { usePathname, useRouter } from "next/navigation";
 import { useSyncExternalStore } from "react";
 
@@ -22,18 +22,18 @@ export function BackLink({ href, label }: { href: string; label: string }) {
     () => null,
   );
   return (
-    <Link
+    <IntentLink
       href={href}
       onClick={(event) => {
         if (previous === null) return;
         event.preventDefault();
         router.back();
       }}
-      className="-ml-1 inline-flex w-fit max-w-full items-center gap-1 rounded-md px-1 py-1 text-[15px] font-semibold text-ink-2 hover:text-ink"
+      className="-ml-1 inline-flex w-fit max-w-full items-center gap-1 rounded-md px-1 py-3 -my-2 text-[15px] font-semibold text-ink-2 hover:text-ink"
       data-no-print
     >
       <Icon name="chevronLeft" size={18} className="shrink-0" />
       <span className="truncate">{previous || label}</span>
-    </Link>
+    </IntentLink>
   );
 }

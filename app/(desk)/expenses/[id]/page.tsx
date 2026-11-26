@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { IntentLink } from "@/components/ui/IntentLink";
 import { notFound } from "next/navigation";
 
 import { CancelEntry } from "@/components/domain/CancelEntry";
@@ -58,9 +58,9 @@ export default async function ExpensePage({ params }: { params: Promise<{ id: st
               {
                 label: t.expenses.trip,
                 value: trip ? (
-                  <Link href={`/trips/${trip.id}`} className="underline underline-offset-2">
+                  <IntentLink href={`/trips/${trip.id}`} className="underline underline-offset-2">
                     {trip.fromPlace} → {trip.toPlace}
-                  </Link>
+                  </IntentLink>
                 ) : (
                   "—"
                 ),

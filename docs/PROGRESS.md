@@ -2,6 +2,29 @@
 
 Newest entry at the top. Rules: `../CLAUDE.md`. Client brief: `Transport Management System Feature Document.docx` (this folder).
 
+## 2026-11-26: slow first clicks, prefetch storm, responsive fixes (branch `perf/startup-prefetch-responsive`)
+
+### Why
+On staging a click on GST waited ~10 s (7 requests finishing together). Measured in Edge: warm GST is ~150 ms; the wait was server start-up / a free connection, made worse by ~40 background prefetches per full page load (every sidebar and report link, each a DB-backed render) on a 5-connection pool.
+
+### Changes
+- **Start-up** (`server/db/index.ts`, `server/db/access.ts`): one timing line per instance in the logs (`[db] real desk ready in … ms (connect, settings+catalog synced|skipped, seed)`); the permission catalog is checked with one read (`accessCatalogInSync`) and the write transaction only runs when the code changed; settings row and catalog run in parallel. Singapore staging: 2366 ms (synced) → 881 ms (skipped).
+- **Pool:** real desk `max 3`, practice `2`, `idle_timeout 20 s` (was 5 / kept forever), so idle Vercel instances give pooler slots back.
+- **Prefetch only on intent:** every `next/link` replaced by `components/ui/IntentLink.tsx` (prefetches on hover / touch / focus). Full load of Reports: ~40 prefetches → 0. A unit test refuses direct `next/link` imports.
+- **Click feedback without streaming:** `LinkPending` (`useLinkStatus`) + a CSS top bar in `styles/motion.css`. **No `loading.tsx` under `app/(desk)`**: it streams pages, so `notFound()` answered 200 instead of 404 and no-JS forms stayed hidden (E2E caught both). A unit test refuses it.
+- **Responsive:** compact sidebar hides labels (were clipped to "Ho", "Tr"); one `<summary>` style (marker inside, 44 px row, rotating chevron, transform only); "Mark as paid" closed panel is one row (grid gap removed); 44 px hit areas on back links, "Show all", "+ Add expense", "+ Book a new parcel", "+ Start a new trip" (padding + negative margin, no layout shift); salary person page advances block aligned to the form width.
+- ESLint ignores `.data/**` (generated databases and Playwright reports).
+
+### Checks
+`pnpm check` green (134 tests), `pnpm test:e2e` 172 passed (phone + desktop, EN + HI, no-JS, roles 404), all 18 tour hooks present (full tour walk not repeated). Production build run against the Singapore staging DB: sign-in, GST (370–880 ms from India), CSV, salary, practice desk.
+
+### Found on the way
+- **Singapore staging DB was missing migration `0002_advances_arrival`** (salary page failed with `relation "staff_advances" does not exist`). Applied with `scripts/migrate.ts` on 2026-11-26. **Production (Mumbai) needs `pnpm db:migrate` before this and the advances release are deployed.**
+- Staging runs in `bom1` against a Singapore database: every query crosses regions (~60–70 ms each), so staging will always feel slower than production.
+
+### Open points
+- Inline links inside text (party names on challans, trips on a party, "Settings" on GST) are still under 44 px; padding would overlap neighbours. Decide whether to restyle as rows.
+
 ## 2026-11-25 (evening): advance khata, scorecards, motion, flow fixes (branch `feat/advances-reports-flow`)
 
 ### Advances to staff (Office work)

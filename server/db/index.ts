@@ -53,20 +53,45 @@ export function getPracticeDb(): Promise<Database> {
 
 async function connectReal(): Promise<Database> {
   const url = process.env.DATABASE_URL;
-  if (url) {
-    const db = await postgresDb(url, "public");
-    await ensureSettings(db);
-    // Staging only: sample data + demo logins for testing. Never on Vercel's production env.
-    if (process.env.SEED_DEMO === "1" && process.env.VERCEL_ENV !== "production")
-      await seedDemo(db);
-    return db;
-  }
   // The live tool must never fall back to a throwaway disk database.
-  if (process.env.VERCEL) throw new Error("DATABASE_URL is missing.");
-  const db = await pgliteDb("pglite");
-  await ensureSettings(db);
-  if (process.env.SEED_DEMO === "1") await seedDemo(db);
+  if (!url && process.env.VERCEL) throw new Error("DATABASE_URL is missing.");
+  const t = startTimer();
+  const db = url ? await postgresDb(url, "public") : await pgliteDb("pglite");
+  const connect = t.lap();
+  const catalog = await ensureSettings(db);
+  const settings = t.lap();
+  // Staging only: sample data + demo logins for testing. Never on Vercel's production env.
+  const seeding =
+    process.env.SEED_DEMO === "1" && (!url || process.env.VERCEL_ENV !== "production");
+  if (seeding) await seedDemo(db);
+  logStart("real", t, { connect, settings, catalog, seed: t.lap() });
   return db;
+}
+
+type Phases = { connect: number; settings: number; catalog: string; seed: number };
+
+/** Millisecond stopwatch: `lap()` returns the time since the last lap. */
+function startTimer() {
+  const begin = performance.now();
+  let last = begin;
+  return {
+    lap(): number {
+      const now = performance.now();
+      const spent = now - last;
+      last = now;
+      return spent;
+    },
+    total: () => performance.now() - begin,
+  };
+}
+
+/** One line per start-up, to see in the logs what a cold instance spends its time on. */
+function logStart(desk: "real" | "practice", t: { total(): number }, p: Phases): void {
+  const ms = (n: number) => Math.round(n);
+  // eslint-disable-next-line no-console -- the one start-up timing line, read in the Vercel logs
+  console.info(
+    `[db] ${desk} desk ready in ${ms(t.total())} ms (connect ${ms(p.connect)}, settings+catalog ${ms(p.settings)} ${p.catalog}, seed ${ms(p.seed)})`,
+  );
 }
 
 /** Sample data + demo logins (admin, neha, ramesh, kishan) with APP_PASSWORD. */
@@ -78,10 +103,14 @@ async function seedDemo(db: Database): Promise<void> {
 
 async function connectPractice(): Promise<Database> {
   const url = process.env.DATABASE_URL;
+  const t = startTimer();
   const db = url ? await postgresDb(url, "practice") : await pgliteDb("practice");
-  await ensureSettings(db);
+  const connect = t.lap();
+  const catalog = await ensureSettings(db);
+  const settings = t.lap();
   const { seedSampleIfEmpty } = await import("@/server/db/sample");
   await seedSampleIfEmpty(db);
+  logStart("practice", t, { connect, settings, catalog, seed: t.lap() });
   return db;
 }
 
@@ -104,11 +133,12 @@ async function postgresDb(url: string, pgSchema: "public" | "practice"): Promise
   const postgres = (await import("postgres")).default;
   const client = postgres(url, {
     prepare: false,
-    // Real desk: up to 5 connections, kept open (no idle close) so requests skip the pooler
-    // handshake. Practice is used rarely: 2. Supabase's session pooler allows ~15 clients in all
-    // (per project, across every Vercel instance), so raise these only with a bigger plan.
-    max: pgSchema === "public" ? 5 : 2,
-    idle_timeout: 0,
+    // Supabase's session pooler allows ~15 clients in all, shared by every Vercel instance plus
+    // local dev. So each instance takes few (real desk 3, rarely used practice desk 2) and hands
+    // idle ones back after 20 s, so a new instance never waits out connect_timeout for a slot.
+    // Raise these only with a bigger plan.
+    max: pgSchema === "public" ? 3 : 2,
+    idle_timeout: 20,
     // Recycle each connection every 30 min so a pooler restart never leaves a dead socket for long.
     max_lifetime: 60 * 30,
     connect_timeout: 10,
@@ -163,7 +193,10 @@ async function migratePracticeSchema(client: Sql): Promise<void> {
 }
 
 /** The single settings row and the access catalog always exist, so reads never need a null branch. */
-async function ensureSettings(db: Database): Promise<void> {
-  await db.insert(schema.settings).values({ id: 1 }).onConflictDoNothing();
-  await ensureAccessCatalog(db);
+async function ensureSettings(db: Database): Promise<"skipped" | "synced"> {
+  const [, catalog] = await Promise.all([
+    db.insert(schema.settings).values({ id: 1 }).onConflictDoNothing(),
+    ensureAccessCatalog(db),
+  ]);
+  return catalog;
 }

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { IntentLink } from "@/components/ui/IntentLink";
 
 import { Money } from "@/components/domain/Money";
 import type { Strings } from "@/content/strings";
@@ -42,12 +42,12 @@ export function LoadPanel({
           </h2>
           <p className="text-[15px] text-ink-2">{t.tripFlow.waitingHelp}</p>
         </div>
-        <Link
+        <IntentLink
           href={`/challans/new?trip=${tripId}`}
-          className="text-[15px] font-semibold text-signal-ink hover:underline"
+          className="-my-3 py-3 text-[15px] font-semibold text-signal-ink hover:underline"
         >
           + {t.tripFlow.bookForTruck}
-        </Link>
+        </IntentLink>
       </div>
       {sorted.length ? (
         <form action={loadOnTrip} className="grid gap-3">

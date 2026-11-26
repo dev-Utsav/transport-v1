@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { IntentLink } from "@/components/ui/IntentLink";
 import { notFound } from "next/navigation";
 
 import { CancelEntry } from "@/components/domain/CancelEntry";
@@ -152,34 +152,34 @@ export default async function ChallanPage({
               {
                 label: t.challans.sender,
                 value: (
-                  <Link
+                  <IntentLink
                     className="font-semibold underline-offset-2 hover:underline"
                     href={`/vendors/${sender.id}`}
                   >
                     {sender.name}
-                  </Link>
+                  </IntentLink>
                 ),
               },
               {
                 label: t.challans.receiver,
                 value: (
-                  <Link
+                  <IntentLink
                     className="font-semibold underline-offset-2 hover:underline"
                     href={`/vendors/${receiver.id}`}
                   >
                     {receiver.name}
-                  </Link>
+                  </IntentLink>
                 ),
               },
               {
                 label: t.challans.trip,
                 value: trip?.id ? (
-                  <Link
+                  <IntentLink
                     className="font-mono underline-offset-2 hover:underline"
                     href={`/trips/${trip.id}`}
                   >
                     {truckNumber}
-                  </Link>
+                  </IntentLink>
                 ) : (
                   t.challans.noTrip
                 ),
@@ -237,7 +237,7 @@ export default async function ChallanPage({
         ) : null}
 
         {c.isCancelled ? null : (
-          <details className="rounded-card px-4 py-3 ring-1 ring-rule sm:px-5" data-no-print>
+          <details className="rounded-card px-4 ring-1 ring-rule open:pb-3 sm:px-5" data-no-print>
             <summary className="cursor-pointer text-[15px] font-semibold text-ink-2">
               {t.tripFlow.correct}
             </summary>

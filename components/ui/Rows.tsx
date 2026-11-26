@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { IntentLink } from "@/components/ui/IntentLink";
 import type { ReactNode } from "react";
 
 import { Icon } from "@/components/ui/Icon";
@@ -35,7 +35,7 @@ export function RowLink({
 }) {
   return (
     <li>
-      <Link
+      <IntentLink
         href={href}
         data-tour={tour}
         className={`flex min-h-16 items-center gap-3 px-4 py-3 transition-colors duration-150 hover:bg-paper focus-visible:bg-paper sm:px-5 ${muted ? "opacity-60" : ""}`}
@@ -51,7 +51,7 @@ export function RowLink({
           </div>
         ) : null}
         <Icon name="chevronRight" size={18} className="shrink-0 text-ink-3" />
-      </Link>
+      </IntentLink>
     </li>
   );
 }

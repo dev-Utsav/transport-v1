@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, notInArray } from "drizzle-orm";
+import { and, eq, notInArray, sql } from "drizzle-orm";
 
 import {
   DEFAULT_ROLE_PERMISSIONS,
@@ -13,13 +13,45 @@ import type { Database } from "@/server/db";
 import { permissions, rolePermissions, roles } from "@/server/db/schema";
 
 /**
- * Runs on every start, idempotent, one transaction:
+ * One read: does the database already match the code? True when every code permission exists and
+ * is live, no other permission is live, every system role exists with none extra active, and
+ * Admin holds every permission. Lets a start skip the write transaction when nothing changed.
+ */
+export async function accessCatalogInSync(db: Database): Promise<boolean> {
+  const keys = sql.join(
+    PERMISSIONS.map((k) => sql`${k}`),
+    sql`, `,
+  );
+  const roleKeys = sql.join(
+    SYSTEM_ROLES.map((k) => sql`${k}`),
+    sql`, `,
+  );
+  const [row] = await db
+    .select({
+      inSync: sql<boolean>`
+      (select count(*) from permissions where key in (${keys}) and not is_retired) = ${PERMISSIONS.length}
+      and (select count(*) from permissions where not is_retired and key not in (${keys})) = 0
+      and (select count(*) from roles where key in (${roleKeys})) = ${SYSTEM_ROLES.length}
+      and (select count(*) from roles where is_system and is_active and key not in (${roleKeys})) = 0
+      and (
+        select count(*) from role_permissions rp join roles r on r.id = rp.role_id
+        where r.key = 'admin' and rp.permission_key in (${keys})
+      ) = ${PERMISSIONS.length}
+    `,
+    })
+    .from(sql`(select 1) as one`);
+  return row?.inSync === true;
+}
+
+/**
+ * Runs on every start, idempotent, one transaction (skipped when `accessCatalogInSync`):
  * - permission keys from the code are inserted (and un-retired); keys the code dropped are retired;
  * - missing system roles are created with their default permissions (existing ones are left
  *   as the admin edited them); system roles the code no longer lists are switched off;
  * - the Admin role is topped up to every permission, so a new feature is never locked out.
  */
-export async function ensureAccessCatalog(db: Database): Promise<void> {
+export async function ensureAccessCatalog(db: Database): Promise<"skipped" | "synced"> {
+  if (await accessCatalogInSync(db)) return "skipped";
   await db.transaction(async (tx) => {
     await tx
       .insert(permissions)
@@ -54,4 +86,5 @@ export async function ensureAccessCatalog(db: Database): Promise<void> {
         .onConflictDoNothing();
     }
   });
+  return "synced";
 }
