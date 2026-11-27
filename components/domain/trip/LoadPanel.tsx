@@ -52,9 +52,12 @@ export function LoadPanel({
       {sorted.length ? (
         <form action={loadOnTrip} className="grid gap-3">
           <input type="hidden" name="tripId" value={tripId} />
-          <ul className="divide-y divide-rule overflow-hidden rounded-card bg-card shadow-card ring-1 ring-rule">
+          <ul
+            data-tour="load-panel"
+            className="divide-y divide-rule overflow-hidden rounded-card bg-card shadow-card ring-1 ring-rule"
+          >
             {sorted.map((w, i) => (
-              <li key={w.id} data-tour={i === 0 ? "load-panel" : undefined}>
+              <li key={w.id}>
                 {i === firstOther && firstOther > 0 ? (
                   <p className="bg-paper/60 px-4 py-2 text-[13px] font-semibold text-ink-2 uppercase">
                     {t.tripFlow.otherPlace}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { FormError } from "@/components/forms/FormError";
 import { PartyPicker } from "@/components/forms/PartyPicker";
@@ -8,6 +8,7 @@ import { useForm } from "@/components/forms/useForm";
 import { Button } from "@/components/ui/Button";
 import { Choice } from "@/components/ui/Choice";
 import { Field, MoneyInput, SelectInput, TextInput } from "@/components/ui/Field";
+import { FORM_STEP_EVENT } from "@/components/tour/tourDom";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import type { Strings } from "@/content/strings";
 import { formatDay } from "@/lib/dates";
@@ -61,6 +62,16 @@ export function ChallanForm({
     () => true,
     () => false,
   );
+
+  // The guided tour's Back opens the panel its step lives on (components/tour/tourDom.ts).
+  useEffect(() => {
+    const onTourStep = (event: Event) => {
+      const panel = event instanceof CustomEvent ? Number(event.detail) : NaN;
+      if (Number.isInteger(panel) && panel >= 0 && panel <= 2) setStep(panel);
+    };
+    window.addEventListener(FORM_STEP_EVENT, onTourStep);
+    return () => window.removeEventListener(FORM_STEP_EVENT, onTourStep);
+  }, []);
 
   const steps = [
     t.challans.stepParties,
@@ -251,7 +262,8 @@ export function ChallanForm({
               id="packages"
               name="packages"
               inputMode="numeric"
-              pattern="[0-9]*"
+              // At least 1, as the server checks (a 0 used to pass here and fail on Save).
+              pattern="0*[1-9][0-9]*"
               required
               defaultValue={v("packages")}
               invalid={Boolean(e("packages"))}
@@ -280,6 +292,8 @@ export function ChallanForm({
             id="freight"
             name="freight"
             required
+            // More than zero, as the server checks (lib/money.ts parseRupees: 1,500.50).
+            pattern="(?=.*[1-9])[0-9, ]*(\.[0-9]{0,2})?"
             defaultValue={v("freight")}
             invalid={Boolean(e("freight"))}
             className="text-[22px] font-semibold"
@@ -288,6 +302,7 @@ export function ChallanForm({
         <Choice
           name="payType"
           tour="pay-type"
+          required
           legend={t.challans.payType}
           defaultValue={PAY_TYPES.find((p) => p === v("payType"))}
           options={PAY_TYPES.map((p) => ({
@@ -301,6 +316,7 @@ export function ChallanForm({
           <Choice
             name="payNowMode"
             legend={t.challans.payNowMode}
+            required
             defaultValue={PAY_MODES.find((m) => m === v("payNowMode"))}
             options={PAY_MODES.map((m) => ({ value: m, label: t.modes[m] }))}
             error={e("payNowMode") ? c.required : undefined}
@@ -318,6 +334,7 @@ export function ChallanForm({
               id="gstRate"
               name="gstRate"
               inputMode="decimal"
+              required
               defaultValue={v("gstRate")}
               invalid={Boolean(e("gstRate"))}
               className="max-w-32"

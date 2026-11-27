@@ -10,6 +10,7 @@ export function Choice<V extends string>({
   error,
   columns = 3,
   tour,
+  required = false,
 }: {
   name: string;
   legend: string;
@@ -18,6 +19,8 @@ export function Choice<V extends string>({
   error?: string | undefined;
   columns?: 2 | 3 | 4;
   tour?: string;
+  /** One must be picked (checked by the form's step Next too, while the group shows). */
+  required?: boolean;
 }) {
   const cols = { 2: "grid-cols-2", 3: "grid-cols-3", 4: "grid-cols-2 sm:grid-cols-4" }[columns];
   return (
@@ -34,6 +37,7 @@ export function Choice<V extends string>({
               name={name}
               value={o.value}
               defaultChecked={o.value === defaultValue}
+              required={required}
               className="sr-only"
             />
             <span className="text-[16px] font-semibold text-ink">{o.label}</span>
@@ -43,7 +47,11 @@ export function Choice<V extends string>({
           </label>
         ))}
       </div>
-      {error ? <p className="text-[14px] font-semibold text-due">{error}</p> : null}
+      {error ? (
+        <p data-error className="text-[14px] font-semibold text-due">
+          {error}
+        </p>
+      ) : null}
     </fieldset>
   );
 }

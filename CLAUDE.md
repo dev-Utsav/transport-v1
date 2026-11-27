@@ -119,6 +119,7 @@ The desk is built around one five-step flow, defined in `lib/flow.ts`: **1 Book 
   - A banner is always visible while on it.
 - **The guided tour** is data in `lib/tour.ts`. It runs only on the practice desk, and each step waits for the person to act (click, pick, type) before moving on.
   - Steps point at `data-tour="…"` hooks. **When you change a screen the tour visits, keep its hook and re-run the tour** (playwright script pattern in `docs/PROGRESS.md`).
+  - **The screen decides, the tour follows** (`lib/tour.ts`): a step counts only when its screen, its New challan panel (`form`) and its target show; a tap moves on only once its result shows (`until` when the next target is already there); only the asked-for answer counts (`value`; never empty or "+ New party"); Back stays on the screen and is hidden after a save (`checkpoint`). No "Skip": on drift the tour moves to the step matching the screen. Keep the path free of fields the tour doesn't fill. `tests/end-to-end/tour.spec.ts` walks it at 390 and 1440.
   - Tour text lives in `content/strings.*.ts` under `tour.steps`, in both languages.
   - The overlay is code-split and positions itself with refs in `requestAnimationFrame`, never with React state.
 

@@ -2,6 +2,30 @@
 
 Newest entry at the top. Rules: `../CLAUDE.md`. Client brief: `Transport Management System Feature Document.docx` (this folder).
 
+## 2026-11-27 (night): the guided tour follows the screen (Utsav's tour/ screenshots)
+
+### What was wrong (reproduced locally, all of it)
+
+- Any pick moved the tour on: "Who pays?" said To-Pay, Paid counted, and Paid needs "Received by", which the tour never asks. Same with "+ New party" (name) and GST (rate).
+- A tap moved the tour on, not its result: the form refused Next / the server refused Save, the form went back to Freight, the tour waited on "Save" (no such button), then "Skip this step".
+- The form let required answers through: the Who pays / Received by radios, the new-party name, the GST rate had no `required`; packages 0 and freight 0 passed the form and failed on the server.
+- **A refused save cleared every `<select>`** (sender, receiver, trip, and the pickers on the expense, payment, trip, advance and user forms): React resets the form after its action and a select went back to its first-render value. Not tour-only.
+- Tour Back moved only the tour, not the form panel; the target was hidden; Back could be pressed forever, also past saved steps.
+- When the form refused Next, the field to fix stayed dimmed and couldn't be tapped.
+- "Load more parcels" only noticed a tick on the first parcel; "Load them" moved on before the load landed.
+
+### Fix (Utsav chose: fixed path, no Back after a save)
+
+- `lib/tour.ts`: steps declare `form` (panel), `value` (To-Pay, Delhi), `until` (`reset` for Load them, `gone` for Deliver), `checkpoint` (no Back). Pure rules with unit tests: `accepts`, `stepShows`, `resolvePending`, `syncToPage`, `canGoBack`.
+- `components/tour/`: `TourOverlay` keeps tour and screen in step (a tap's step moves on when its result shows; drift → the step matching the screen, 400 ms for a panel change, 2.5 s for a missing target; nothing matches → "Take me there"). `TourBubble` (spotlight, listeners, the refused field lit instead of the button until filled), `TourControls`, `tourDom`. "Skip this step" is gone; new hints: wrong choice, fix first, waiting, stuck (en + hi).
+- Tour Back opens the form panel of the step (`td-tour-form-step` event, `ChallanForm` listens).
+- `ChallanForm`: required radios (`Choice required`), GST rate, new-party name; packages ≥ 1 and freight > 0 patterns like the server. `SelectInput` remounts when its starting value changes, so a refused save keeps every picked option. Load panel hook on the whole list.
+- Copy: sender / receiver "from the list"; typing steps say "then tap Next here".
+
+### Checks
+
+`pnpm check` green (166 tests, 18 of them the tour rules). `pnpm test:e2e` 198 passed. New `tests/end-to-end/tour.spec.ts` at 390 + 1440: full walk to Finish with no Skip; only the asked answer counts; refused Next (field lit and tappable, hint, tour stays); tour Back moves the form and carries on; pause → form Back → Resume follows; refused save → tour on the field, parties and To-Pay kept; Hindi hints fit. Screenshots looked at (phone + desktop, en + hi).
+
 ## 2026-11-27 (evening, later): Settings → Take the tour answered 500 on live
 
 - **Seen on live:** the POST fails in 347 ms with "Something went wrong" (React #441 in the console). Locally (PGlite) the same flow works, so it is the Postgres practice path: session pooler, `practice` schema, search_path check, practice migrations, sample reset. Fails too fast for a timeout. **Cause not known yet:** no access to the Vercel logs, and a direct read of the live database was refused (rightly) in this session.

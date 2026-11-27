@@ -99,6 +99,10 @@ export function SelectInput({
   return (
     <div className="relative">
       <select
+        // React resets a form after its action; a <select> then went back to the value it was
+        // first rendered with, so a refused save lost the chosen party / truck (2026-11-27).
+        // A new starting value (what was sent) mounts a fresh select that resets to it.
+        key={String(rest.defaultValue ?? "")}
         className={`${CONTROL} appearance-none pr-11 ${className}`}
         aria-invalid={invalid || undefined}
         {...rest}

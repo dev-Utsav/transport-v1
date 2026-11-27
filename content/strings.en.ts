@@ -525,8 +525,11 @@ export const en = {
     progress: "{n} of {total}",
     lost: "The tour continues on another screen.",
     goThere: "Take me there",
-    skipStep: "Skip this step",
+    stuck: "This screen has changed. Open it again to carry on with the tour.",
     doIt: "Your turn: do it on the screen",
+    wrongChoice: "Not that one: for the tour, pick exactly what it says above.",
+    fixFirst: "First fill the field marked on the screen, then tap again.",
+    waiting: "One moment, the screen is updating…",
     keep: "Keep practising",
     steps: {
       welcome: {
@@ -539,20 +542,23 @@ export const en = {
       },
       sender: {
         title: "Who is sending it?",
-        body: "Pick the sender from the list. New parties can be added right here with + New party.",
+        body: "Pick the sender from the list. (Later, + New party adds a new one right here.)",
       },
-      receiver: { title: "Who receives it?", body: "Pick the receiver." },
+      receiver: { title: "Who receives it?", body: "Pick the receiver from the list." },
       next1: { title: "Next", body: "Tap Next. The challan is filled one small step at a time." },
       to: {
         title: "Where is it going?",
-        body: "Type Delhi (places you used before show up as suggestions).",
+        body: "Type Delhi, then tap Next here (places you used before show up as suggestions).",
       },
       packages: {
         title: "How many packages?",
-        body: "Type the number of packages, for example 10.",
+        body: "Type the number of packages, for example 10, then tap Next here.",
       },
       next2: { title: "Next", body: "Tap Next." },
-      freight: { title: "Freight", body: "Type the freight amount, for example 1500." },
+      freight: {
+        title: "Freight",
+        body: "Type the freight amount, for example 1500, then tap Next here.",
+      },
       payType: {
         title: "Who pays?",
         body: "Choose To-Pay: the receiver will pay when the parcel is delivered.",

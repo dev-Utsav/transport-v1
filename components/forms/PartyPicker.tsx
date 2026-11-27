@@ -52,6 +52,7 @@ export function PartyPicker({
           <TextInput
             id={`${prefix}NewName`}
             name={`${prefix}NewName`}
+            required
             defaultValue={v(`${prefix}NewName`)}
             invalid={Boolean(e(`${prefix}NewName`))}
           />
