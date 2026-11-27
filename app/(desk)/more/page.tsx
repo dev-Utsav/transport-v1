@@ -12,9 +12,13 @@ import { getT } from "@/server/lang";
 export const metadata: Metadata = { title: "More" };
 
 /** Phone only in practice: everything not in the tab bar, as big rows. */
-export default async function MorePage() {
+export default async function MorePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ practice?: string }>;
+}) {
   const actor = await requireAccess();
-  const t = await getT();
+  const [t, { practice }] = await Promise.all([getT(), searchParams]);
   const items = [
     ...allowedNav(mainNav(t), actor.permissions).filter(
       (i) => !["/", "/trips", "/vendors"].includes(i.href),
@@ -25,7 +29,7 @@ export default async function MorePage() {
     <>
       <PageHead title={t.nav.more} />
       <div className="mb-6">
-        <TourEntry t={t} />
+        <TourEntry t={t} from="/more" failed={practice === "failed"} />
       </div>
       <ul className="grid gap-2">
         {items.map((item) => (

@@ -8,10 +8,23 @@ import { resetSample } from "@/server/db/sample";
 import { assertCan } from "@/server/auth";
 import { PRACTICE_COOKIE } from "@/server/practice-flag";
 
-/** Opens the practice desk with fresh sample data; with tour=1 the guided tour starts on Home. */
+/** Screens with a practice / tour button, where a failed start comes back to. */
+const ENTRY_SCREENS = ["/", "/more", "/settings"] as const;
+
+/**
+ * Opens the practice desk with fresh sample data; with tour=1 the guided tour starts on Home.
+ * If the practice database can't open, the person goes back to the screen they came from with a
+ * message (never the error screen); the real desk is untouched. The cause goes to the logs.
+ */
 export async function startPractice(formData: FormData): Promise<void> {
   await assertCan();
-  await resetSample(await getPracticeDb());
+  const from = ENTRY_SCREENS.find((p) => p === formData.get("from")) ?? "/";
+  try {
+    await resetSample(await getPracticeDb());
+  } catch (err) {
+    console.error("[practice] could not open the practice desk:", err);
+    redirect(`${from}?practice=failed`, RedirectType.replace);
+  }
   (await cookies()).set(PRACTICE_COOKIE, "1", {
     path: "/",
     sameSite: "lax",

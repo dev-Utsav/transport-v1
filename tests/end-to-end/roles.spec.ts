@@ -34,6 +34,11 @@ test("a driver lands on their own trips and can't open the office screens", asyn
 test("a helper sees trips and parcels, no salary or settings", async ({ page }) => {
   await signIn(page, "kishan");
   await expect(page).toHaveURL(/\/$/);
+  // Home shows the work board, but no money, no parties and no buttons to screens they can't open.
+  await expect(page.getByText("Collected today")).toHaveCount(0);
+  await expect(page.getByText("Spent today")).toHaveCount(0);
+  await expect(page.getByText("Payment reminders")).toHaveCount(0);
+  await expect(page.locator('a[href^="/vendors"], a[href^="/challans/new"]')).toHaveCount(0);
   expect((await page.goto("/trips"))?.status()).toBe(200);
   expect((await page.goto("/salary"))?.status()).toBe(404);
   expect((await page.goto("/settings"))?.status()).toBe(404);

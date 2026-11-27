@@ -30,7 +30,28 @@ export type DbTarget = {
 };
 
 export function practiceDeskTarget(env: DbEnv): DbTarget | null {
-  return env.DATABASE_URL ? { url: env.DATABASE_URL, mode: "session", max: 1 } : null;
+  if (!env.DATABASE_URL) return null;
+  return {
+    url: sessionPoolerUrl(env.DATABASE_URL, env.DATABASE_POOL_URL),
+    mode: "session",
+    max: 1,
+  };
+}
+
+/** Supabase's direct host, `db.<ref>.supabase.co`: IPv6 only, so Vercel can't resolve it. */
+const DIRECT_HOST = /^db\.[a-z0-9]+\.supabase\.co$/;
+
+/**
+ * A session-mode URL Vercel can reach. Production's DATABASE_URL pointed at the direct host and
+ * Take the tour failed with `getaddrinfo ENOTFOUND` (2026-11-27). Supavisor serves session mode
+ * (5432) on the same host and login as the transaction pooler (6543), so the pool URL on 5432 is
+ * the session pooler.
+ */
+function sessionPoolerUrl(url: string, poolUrl: string | undefined): string {
+  if (!poolUrl || !DIRECT_HOST.test(new URL(url).hostname)) return url;
+  const session = new URL(poolUrl);
+  session.port = "5432";
+  return session.toString();
 }
 
 export function realDeskTarget(env: DbEnv): DbTarget | null {
@@ -47,3 +68,20 @@ function withoutPoolUrl(env: DbEnv, sessionUrl: string): DbTarget {
   void env;
   return { url: sessionUrl, mode: "session", max: 3 };
 }
+
+/**
+ * Idle connections close after this many seconds (postgres.js `idle_timeout`).
+ *
+ * Vercel pauses an instance between requests. A paused instance can't run that timer, so its
+ * connections stayed open, the pooler dropped them, and the next request's queries waited on
+ * dead sockets: 10-19 s clicks and pages hanging for minutes (2026-11-27).
+ */
+export const IDLE_CLOSE_SECONDS = 5;
+
+/**
+ * How long each request keeps its instance awake after it answers (`after()`, which is
+ * `waitUntil` on Vercel): until the idle connections have closed, so no connection is ever left
+ * open while the instance is paused. Same idea as `attachDatabasePool` in @vercel/functions,
+ * which doesn't support postgres.js.
+ */
+export const HOLD_AWAKE_MS = (IDLE_CLOSE_SECONDS + 1) * 1000;

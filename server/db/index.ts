@@ -4,9 +4,18 @@ import { mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
+import { after } from "next/server";
 import type { Sql } from "postgres";
+import { cache } from "react";
 
-import { practiceDeskTarget, realDeskTarget, type DbEnv, type DbTarget } from "@/lib/db-target";
+import {
+  HOLD_AWAKE_MS,
+  IDLE_CLOSE_SECONDS,
+  practiceDeskTarget,
+  realDeskTarget,
+  type DbEnv,
+  type DbTarget,
+} from "@/lib/db-target";
 import { ensureAccessCatalog } from "@/server/db/access";
 import * as schema from "@/server/db/schema";
 import { isPracticeRequest } from "@/server/practice-flag";
@@ -25,8 +34,23 @@ const handles: Handles = (globalForDb.__tmsDb ??= {});
  * - Not set (local only): embedded PGlite in `.data/` (practice in `.data/practice`).
  */
 export async function getDb(): Promise<Database> {
+  holdAwakeUntilIdle();
   return (await isPracticeRequest()) ? getPracticeDb() : getRealDb();
 }
+
+/**
+ * On Vercel, keep this instance awake after the response until its idle connections have
+ * closed (lib/db-target.ts, HOLD_AWAKE_MS), so none is left open while the instance is paused.
+ * Once per request (React `cache`). Outside a request (scripts, tests) there is nothing to hold.
+ */
+const holdAwakeUntilIdle = cache((): void => {
+  if (!process.env.VERCEL) return;
+  try {
+    after(() => new Promise<void>((done) => setTimeout(done, HOLD_AWAKE_MS)));
+  } catch {
+    // Not inside a request: no instance to keep awake.
+  }
+});
 
 /** Integration tests hand in their own in-memory databases (tests/fixtures/db.ts). */
 export function setDatabasesForTest(real: Database, practice: Database): void {
@@ -142,8 +166,8 @@ async function postgresDb(target: DbTarget, pgSchema: "public" | "practice"): Pr
     // Required on the transaction pooler: a prepared statement doesn't survive the transaction.
     prepare: false,
     max: target.max,
-    // Hand idle connections back after 20 s, so a quiet instance doesn't hold pooler slots.
-    idle_timeout: 20,
+    // Close idle connections soon; each request stays awake until they have (holdAwakeUntilIdle).
+    idle_timeout: IDLE_CLOSE_SECONDS,
     // Recycle each connection every 30 min so a pooler restart never leaves a dead socket for long.
     max_lifetime: 60 * 30,
     connect_timeout: 10,

@@ -2,13 +2,47 @@
 
 Newest entry at the top. Rules: `../CLAUDE.md`. Client brief: `Transport Management System Feature Document.docx` (this folder).
 
+## 2026-11-27 (evening, later): Settings → Take the tour answered 500 on live
+
+- **Seen on live:** the POST fails in 347 ms with "Something went wrong" (React #441 in the console). Locally (PGlite) the same flow works, so it is the Postgres practice path: session pooler, `practice` schema, search_path check, practice migrations, sample reset. Fails too fast for a timeout. **Cause not known yet:** no access to the Vercel logs, and a direct read of the live database was refused (rightly) in this session.
+- **Handled:** `startPractice` catches a failed practice database, logs it as `[practice] could not open the practice desk: …`, and sends the person back to the screen they came from (`from` = `/`, `/more`, `/settings`, anything else → `/`) with a message (`practice.failed`, en + hi). The practice cookie is not set, so they stay on the real desk.
+- Tests: `tests/integrated/practice.test.ts` (opens; failure → back with message, no cookie; unknown `from`), `tests/end-to-end/practice.spec.ts` (Take the tour → practice banner + tour → back; Practice desk twice).
+- **Cause (Vercel logs, from Utsav):** `getaddrinfo ENOTFOUND db.mksgmvkvqohwbvutilob.supabase.co`. Production's `DATABASE_URL` is Supabase's **direct** host (IPv6 only; Vercel can't resolve it). The real desk was fine because it uses `DATABASE_POOL_URL`.
+- **Fixed in code:** `practiceDeskTarget` (`lib/db-target.ts`) uses the pool URL's host on port 5432 (the session pooler) when `DATABASE_URL` is the direct host. Unit tests in `tests/unit/db-target.test.ts`.
+- **To do in Vercel:** set Production `DATABASE_URL` to the session pooler (Supabase → Connect → Session pooler, port 5432). CI migrations (`scripts/migrate.sh`) use it too, and GitHub runners can't reach the direct host either.
+- **Same logs, the hangs:** `/`, `/new`, `/trips/new`, `/challans/new` hit "Task timed out after 300 seconds" on 5 instances between 10:52 and 10:55 UTC, with no DB error. So nothing ended the waiting query: the `statement_timeout` startup parameter is **not** applied through the transaction pooler (the open point above). **To do in Supabase SQL editor:** `alter role postgres set statement_timeout = '15s'; alter role postgres set idle_in_transaction_session_timeout = '30s';` (migrations set their own 5 min for their session, so they are unaffected).
+
+## 2026-11-27 (evening): 19 s clicks and hanging pages on live; role access matrix (on `main`)
+
+### Slow clicks
+
+- **Seen on live (signed-in browser):** the first request on an instance took 10–19 s now and then (`/salary` 19.5 s, `/reports/money` 10.8 s), the rest 60–180 ms. Later `/new`, `/trips/new` and `/challans/new` hung for over 40 s each, every time, for about two minutes (`/new` runs no page query, only auth + settings), then recovered. Other routes stayed fast meanwhile, so one instance (one function group) was stuck. Idle gaps of 10 s to 6 min alone did not reproduce it.
+- **Likely cause:** Vercel pauses an instance between requests; postgres.js's `idle_timeout` (was 20 s) can't fire while paused, so connections stay open, the pooler drops them, and the next queries wait on dead sockets. Not confirmed from the Vercel logs yet (no access in this session).
+- **Fix:** `idle_timeout` 5 s (`IDLE_CLOSE_SECONDS`, `lib/db-target.ts`), and `getDb()` keeps the request's instance awake with `after()` for `HOLD_AWAKE_MS` (6 s) after it answers, so no connection is open while paused. That is what `attachDatabasePool` (@vercel/functions) does; it doesn't support postgres.js. Test: `tests/unit/db-target.test.ts`.
+- The "two requests" per click are the hover prefetch (IntentLink) and the click. Both are reads, and both waited on the same stuck instance; removing one would not have removed the wait.
+- **To verify after deploy:** open `/new`, `/trips/new`, `/challans/new` after 10+ min idle; filter Vercel logs for `[db]` and timeouts.
+
+### Role access (who sees what)
+
+- New `tests/end-to-end/access-matrix.spec.ts`: every screen (ids found from the admin's lists) and every API route, opened by admin, neha (office), ramesh (driver), kishan (helper): opens exactly when the role's default grants allow it (page 404 / API 403 otherwise); every link each role is shown must open; signed out, everything goes to login / 401. A guard test fails if a new `page.tsx` isn't in the table.
+- **Leak found and fixed:** a helper's Home showed today's money (collected by mode, spent), the overdue parties (names, amounts, phone, WhatsApp reminder), the amount to collect, and buttons to Book / parties / expenses (all 404 for them). Home now shows money only with `reports.view`, overdue parties and the Collect amount only with `parties.view`, the spent tile links to expenses only with `expenses.view`, and each work-board button only when its screen opens. Hidden sections skip their queries. `roles.spec.ts` checks the helper's Home.
+- Office, driver and helper otherwise open exactly what their grants allow (no URL leak). Driver trip scope stays covered by `roles.spec.ts`.
+- `playwright.config.ts`: the local E2E server blanks `VERCEL`, `VERCEL_ENV`, `VERCEL_URL`, `DATABASE_POOL_URL`. `vercel pull` writes `VERCEL=1` into `.env.production.local`, and the local server then refused its test database.
+- **Open (client):** who should see today's money on Home: `reports.view` (admin, office) is the default chosen here.
+
 ## 2026-11-27 (later): live desk errors under parallel load, EMAXCONNSESSION
 
 - **Seen on live:** an `/expenses` request took 9.72 s. Probe from a signed-in browser: one request at a time is 80–140 ms, but 12 parallel requests that land on new instances take 10–11 s each, and with 8–14 parallel about 70% return the error screen. The status stays 200 because the error is streamed inside the RSC body (`E{"digest":…}`), so check body size, not status.
 - **Cause (Vercel logs):** `(EMAXCONNSESSION) max clients reached in session mode - max clients are limited to pool_size: 15`. Every Vercel instance opens its own pool (up to 3), and a burst starts 10–18 instances. Start-up itself is fine: `[db] real desk ready in 29–242 ms`.
 - **Fix:** `lib/db-target.ts` (unit test `tests/unit/db-target.test.ts`). The real desk uses the **transaction pooler** (`DATABASE_POOL_URL`, port 6543, max 3 per instance). The practice desk stays on the session pooler with 1 connection, because it relies on `search_path`. Migrations stay on `DATABASE_URL`, because they hold an advisory lock. The real desk no longer sends `search_path`.
 - **To deploy:** add `DATABASE_POOL_URL` to Vercel Production: Supabase → Connect → Transaction pooler, the same URL as `DATABASE_URL` with port 6543. Then repeat the burst probe and check the logs for EMAXCONNSESSION.
+- **Verified on live (PR #3 deployed):** 66 `/expenses` requests (4 one at a time, then bursts of 12, 20 and 30), 0 errors, all full pages. One at a time 116–138 ms, bursts at most 1.1 s (one cold start). Not yet tried: a save on live.
 - **Open:** confirm on live whether Supavisor's transaction mode keeps the `statement_timeout` startup parameter. If not, set it on the role (`alter role … set statement_timeout = '15s'`). Decide what production does without `DATABASE_POOL_URL` (`withoutPoolUrl` in `lib/db-target.ts`).
+
+## 2026-11-27: Phase 2 feature research (docs only)
+
+- New `docs/PHASE-2-FEATURES.md`. It covers competitors (LogisticsX, Fleetbase, Fleetx, Fretron, LocoNav, BlackBuck, desktop bilty software), about 35 features by flow step marked Funnel / Hook / Pay, a plan shape, the build order, what not to build, and the open points (GSP, ULIP, WhatsApp API, payment gateway, GTA GST, TDS).
+- First picks: documents due, public tracking page + QR on the bilty, Excel import, Gujarati, a "Made with" footer on shared papers.
 
 ## 2026-11-26 (later): production deploys from `main` with automatic migrations (branch `ci/production-deploy`)
 

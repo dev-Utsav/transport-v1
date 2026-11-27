@@ -31,7 +31,7 @@ const when = new Intl.DateTimeFormat("en-IN", {
 export default async function SettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ saved?: string }>;
+  searchParams: Promise<{ saved?: string; practice?: string }>;
 }) {
   const actor = await requireAccess(
     "settings.manage",
@@ -45,7 +45,7 @@ export default async function SettingsPage({
     users: can(actor, "users.manage"),
     backup: can(actor, "backup.download"),
   };
-  const [{ saved }, t, lang, settings, backups] = await Promise.all([
+  const [{ saved, practice }, t, lang, settings, backups] = await Promise.all([
     searchParams,
     getT(),
     getLang(),
@@ -57,7 +57,7 @@ export default async function SettingsPage({
       <Saved show={saved === "1"} label={t.common.saved} />
       <PageHead title={t.settings.title} />
       <div className="grid max-w-2xl gap-10">
-        <TourEntry t={t} />
+        <TourEntry t={t} from="/settings" failed={practice === "failed"} />
 
         <Section title={t.common.language}>
           <div className="max-w-xs">

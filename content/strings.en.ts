@@ -512,6 +512,8 @@ export const en = {
     reset: "Start over",
     open: "Practice desk",
     openHelp: "Try anything on sample data. Your real records stay untouched.",
+    failed:
+      "The practice desk couldn't open just now. Your real desk is fine. Try again in a minute.",
   },
   tour: {
     start: "Take the tour",

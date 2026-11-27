@@ -8,9 +8,12 @@ import { startPractice } from "@/server/actions/practice";
 export function GettingStarted({
   t,
   done,
+  failed = false,
 }: {
   t: Strings;
   done: { business: boolean; truck: boolean; driver: boolean; party: boolean };
+  /** The practice desk didn't open (server/actions/practice.ts). */
+  failed?: boolean;
 }) {
   const items = [
     { key: "business", label: t.start.business, href: "/settings", ok: done.business },
@@ -56,10 +59,16 @@ export function GettingStarted({
         action={startPractice}
         className="grid gap-2 rounded-field bg-road p-4 text-road-text sm:grid-cols-[1fr_auto] sm:items-center"
       >
+        <input type="hidden" name="from" value="/" />
         <input type="hidden" name="tour" value="1" />
         <div>
           <p className="text-[16px] font-bold">{t.start.tour}</p>
           <p className="text-[14px] text-road-muted">{t.start.tourHelp}</p>
+          {failed ? (
+            <p role="alert" className="mt-2 text-[14px] font-semibold">
+              {t.practice.failed}
+            </p>
+          ) : null}
         </div>
         <button className="min-h-12 rounded-field bg-road-signal px-5 font-semibold text-road">
           {t.tour.start}

@@ -9,11 +9,15 @@ import type { flowCounts } from "@/server/queries/flow";
 
 type Counts = Awaited<ReturnType<typeof flowCounts>>;
 
+/** Which steps' buttons this person may follow, and whether they may see money owed. */
+export type FlowAccess = Record<FlowStage, boolean>;
+
 /**
  * Home's work board: the five steps in order, each with what is waiting and its one button.
- * A step with work waiting is marked so the eye goes there first.
+ * A step with work waiting is marked so the eye goes there first. A step the person can't open
+ * keeps its place in the flow but has no button, and Collect hides the amount owed.
  */
-export function FlowBoard({ t, counts }: { t: Strings; counts: Counts }) {
+export function FlowBoard({ t, counts, may }: { t: Strings; counts: Counts; may: FlowAccess }) {
   const loadHref = counts.firstLoadingTripId ? `/trips/${counts.firstLoadingTripId}` : "/trips/new";
   const steps: Record<FlowStage, { count: string; href: string; cta: string; hasWork: boolean }> = {
     book: {
@@ -41,13 +45,15 @@ export function FlowBoard({ t, counts }: { t: Strings; counts: Counts }) {
       hasWork: counts.arrived > 0,
     },
     collect: {
-      count: fill(t.flow.count.collect, {
-        amount: formatMoney(counts.pending),
-        n: counts.pendingParties,
-      }),
+      count: may.collect
+        ? fill(t.flow.count.collect, {
+            amount: formatMoney(counts.pending),
+            n: counts.pendingParties,
+          })
+        : "",
       href: "/vendors?due=1",
       cta: t.flow.cta.collect,
-      hasWork: counts.pending > 0,
+      hasWork: may.collect && counts.pending > 0,
     },
   };
   return (
@@ -83,13 +89,15 @@ export function FlowBoard({ t, counts }: { t: Strings; counts: Counts }) {
                   {s.count}
                 </span>
               </span>
-              <IntentLink
-                href={s.href}
-                data-tour={`flow-${stage}-cta`}
-                className={`row-span-2 inline-flex min-h-11 items-center justify-center rounded-field px-3 text-center text-[14px] font-semibold transition-colors duration-150 lg:row-span-1 lg:min-h-12 ${isFirst ? "bg-signal text-card hover:bg-signal-hover" : "bg-paper text-ink ring-1 ring-rule-strong hover:bg-paper-deep"}`}
-              >
-                {s.cta}
-              </IntentLink>
+              {may[stage] ? (
+                <IntentLink
+                  href={s.href}
+                  data-tour={`flow-${stage}-cta`}
+                  className={`row-span-2 inline-flex min-h-11 items-center justify-center rounded-field px-3 text-center text-[14px] font-semibold transition-colors duration-150 lg:row-span-1 lg:min-h-12 ${isFirst ? "bg-signal text-card hover:bg-signal-hover" : "bg-paper text-ink ring-1 ring-rule-strong hover:bg-paper-deep"}`}
+                >
+                  {s.cta}
+                </IntentLink>
+              ) : null}
             </li>
           );
         })}

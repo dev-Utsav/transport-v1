@@ -66,6 +66,12 @@ export default defineConfig({
           CRON_SECRET: "e2e-cron-secret-0000",
           SESSION_SECRET: "e2e-session-secret-0000000000000000000000",
           DATABASE_URL: "",
+          DATABASE_POOL_URL: "",
+          // `vercel pull` writes VERCEL=1 into .env.production.local, which `next start` loads;
+          // the server would then refuse its local test database ("DATABASE_URL is missing").
+          VERCEL: "",
+          VERCEL_ENV: "",
+          VERCEL_URL: "",
         },
       },
 });

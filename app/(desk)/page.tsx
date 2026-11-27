@@ -1,7 +1,7 @@
 import { IntentLink } from "@/components/ui/IntentLink";
 import { redirect } from "next/navigation";
 
-import { FlowBoard } from "@/components/domain/FlowBoard";
+import { FlowBoard, type FlowAccess } from "@/components/domain/FlowBoard";
 import { GettingStarted } from "@/components/domain/GettingStarted";
 import { Money } from "@/components/domain/Money";
 import { RemindButton } from "@/components/domain/RemindButton";
@@ -23,19 +23,38 @@ import { listTrips } from "@/server/queries/trips";
 import { overdueVendors } from "@/server/queries/vendors";
 import { getSettings } from "@/server/settings";
 
-export default async function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ practice?: string }>;
+}) {
   const actor = await requireAccess();
   // The work board is the office's view of every parcel; a driver starts on their own trips.
   if (!can(actor, "challans.view")) redirect("/trips");
   const today = istDay();
-  const [t, settings, practice] = await Promise.all([getT(), getSettings(), isPracticeRequest()]);
+  const [t, settings, practice, { practice: practiceStart }] = await Promise.all([
+    getT(),
+    getSettings(),
+    isPracticeRequest(),
+    searchParams,
+  ]);
+  // Money and parties only for those allowed to see them (a helper books nothing, sees no money).
+  const seesMoney = can(actor, "reports.view");
+  const seesParties = can(actor, "parties.view");
   const [counts, money, onRoad, overdue, setup] = await Promise.all([
     flowCounts(today),
-    daySummary(today),
+    seesMoney ? daySummary(today) : null,
     listTrips("open"),
-    overdueVendors(shiftDay(today, -settings.reminderDays)),
+    seesParties ? overdueVendors(shiftDay(today, -settings.reminderDays)) : [],
     setupState(),
   ]);
+  const may: FlowAccess = {
+    book: can(actor, "challans.book"),
+    load: can(actor, counts.firstLoadingTripId ? "trips.view" : "trips.manage"),
+    road: can(actor, "trips.view"),
+    deliver: can(actor, "trips.view"),
+    collect: seesParties,
+  };
   const needsSetup = !practice && (!setup.hasTruck || !setup.hasParty || !settings.businessName);
 
   const office = (
@@ -77,6 +96,7 @@ export default async function HomePage() {
       {needsSetup ? (
         <GettingStarted
           t={t}
+          failed={practiceStart === "failed"}
           done={{
             business: Boolean(settings.businessName),
             truck: setup.hasTruck,
@@ -86,39 +106,44 @@ export default async function HomePage() {
         />
       ) : null}
 
-      <FlowBoard t={t} counts={counts} />
+      <FlowBoard t={t} counts={counts} may={may} />
 
       {/* Today's money, on the dark ground: collected by mode, and spent. */}
-      <section
-        aria-label={t.home.collected}
-        className="grid grid-cols-2 gap-px overflow-hidden rounded-card bg-road-2 text-road-text shadow-lift"
-      >
-        <div className="grid gap-2 bg-road p-5">
-          <span className="text-[14px] font-semibold text-road-muted">{t.home.collected}</span>
-          <span className="num text-[24px] leading-tight font-bold">
-            <Money paise={money.collectedTotal} />
-          </span>
-          <dl className="grid gap-0.5 text-[13px] sm:text-[14px]">
-            {PAY_MODES.map((mode) => (
-              <div key={mode} className="flex justify-between gap-3">
-                <dt className="text-road-muted">{t.modes[mode]}</dt>
-                <dd className="num">
-                  <Money paise={money.collected[mode]} />
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-        <IntentLink
-          href="/expenses"
-          className="grid content-start gap-2 bg-road p-5 transition-colors duration-150 hover:bg-road-2"
+      {money ? (
+        <section
+          aria-label={t.home.collected}
+          className="grid grid-cols-2 gap-px overflow-hidden rounded-card bg-road-2 text-road-text shadow-lift"
         >
-          <span className="text-[14px] font-semibold text-road-muted">{t.home.spent}</span>
-          <span className="num text-[24px] leading-tight font-bold">
-            <Money paise={money.spent} />
-          </span>
-        </IntentLink>
-      </section>
+          <div className="grid gap-2 bg-road p-5">
+            <span className="text-[14px] font-semibold text-road-muted">{t.home.collected}</span>
+            <span className="num text-[24px] leading-tight font-bold">
+              <Money paise={money.collectedTotal} />
+            </span>
+            <dl className="grid gap-0.5 text-[13px] sm:text-[14px]">
+              {PAY_MODES.map((mode) => (
+                <div key={mode} className="flex justify-between gap-3">
+                  <dt className="text-road-muted">{t.modes[mode]}</dt>
+                  <dd className="num">
+                    <Money paise={money.collected[mode]} />
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+          {can(actor, "expenses.view") ? (
+            <IntentLink
+              href="/expenses"
+              className="grid content-start gap-2 bg-road p-5 transition-colors duration-150 hover:bg-road-2"
+            >
+              <Spent label={t.home.spent} paise={money.spent} />
+            </IntentLink>
+          ) : (
+            <div className="grid content-start gap-2 bg-road p-5">
+              <Spent label={t.home.spent} paise={money.spent} />
+            </div>
+          )}
+        </section>
+      ) : null}
 
       {onRoad.length ? (
         <Section
@@ -190,5 +215,16 @@ export default async function HomePage() {
         </Section>
       ) : null}
     </div>
+  );
+}
+
+function Spent({ label, paise }: { label: string; paise: number }) {
+  return (
+    <>
+      <span className="text-[14px] font-semibold text-road-muted">{label}</span>
+      <span className="num text-[24px] leading-tight font-bold">
+        <Money paise={paise} />
+      </span>
+    </>
   );
 }
