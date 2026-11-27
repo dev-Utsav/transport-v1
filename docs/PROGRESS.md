@@ -2,6 +2,14 @@
 
 Newest entry at the top. Rules: `../CLAUDE.md`. Client brief: `Transport Management System Feature Document.docx` (this folder).
 
+## 2026-11-27 (later): live desk errors under parallel load, EMAXCONNSESSION
+
+- **Seen on live:** an `/expenses` request took 9.72 s. Probe from a signed-in browser: one request at a time is 80–140 ms, but 12 parallel requests that land on new instances take 10–11 s each, and with 8–14 parallel about 70% return the error screen. The status stays 200 because the error is streamed inside the RSC body (`E{"digest":…}`), so check body size, not status.
+- **Cause (Vercel logs):** `(EMAXCONNSESSION) max clients reached in session mode - max clients are limited to pool_size: 15`. Every Vercel instance opens its own pool (up to 3), and a burst starts 10–18 instances. Start-up itself is fine: `[db] real desk ready in 29–242 ms`.
+- **Fix:** `lib/db-target.ts` (unit test `tests/unit/db-target.test.ts`). The real desk uses the **transaction pooler** (`DATABASE_POOL_URL`, port 6543, max 3 per instance). The practice desk stays on the session pooler with 1 connection, because it relies on `search_path`. Migrations stay on `DATABASE_URL`, because they hold an advisory lock. The real desk no longer sends `search_path`.
+- **To deploy:** add `DATABASE_POOL_URL` to Vercel Production: Supabase → Connect → Transaction pooler, the same URL as `DATABASE_URL` with port 6543. Then repeat the burst probe and check the logs for EMAXCONNSESSION.
+- **Open:** confirm on live whether Supavisor's transaction mode keeps the `statement_timeout` startup parameter. If not, set it on the role (`alter role … set statement_timeout = '15s'`). Decide what production does without `DATABASE_POOL_URL` (`withoutPoolUrl` in `lib/db-target.ts`).
+
 ## 2026-11-26 (later): production deploys from `main` with automatic migrations (branch `ci/production-deploy`)
 
 - `.github/workflows/production.yml`: push to `main` → `vercel pull` + `vercel build --prod` → `scripts/migrate.sh` → `vercel deploy --prebuilt --prod`. One run at a time, queued. No tests in CI yet (still local, CLAUDE.md §11). Vercel Git deploys of `main` switched off in `vercel.json`.
