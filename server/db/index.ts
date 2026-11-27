@@ -6,6 +6,7 @@ import path from "node:path";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import type { Sql } from "postgres";
 
+import { practiceDeskTarget, realDeskTarget, type DbEnv, type DbTarget } from "@/lib/db-target";
 import { ensureAccessCatalog } from "@/server/db/access";
 import * as schema from "@/server/db/schema";
 import { isPracticeRequest } from "@/server/practice-flag";
@@ -51,18 +52,23 @@ export function getPracticeDb(): Promise<Database> {
   return handles.practice;
 }
 
+function dbEnv(): DbEnv {
+  const { DATABASE_URL, DATABASE_POOL_URL, VERCEL_ENV } = process.env;
+  return { DATABASE_URL, DATABASE_POOL_URL, VERCEL_ENV };
+}
+
 async function connectReal(): Promise<Database> {
-  const url = process.env.DATABASE_URL;
+  const target = realDeskTarget(dbEnv());
   // The live tool must never fall back to a throwaway disk database.
-  if (!url && process.env.VERCEL) throw new Error("DATABASE_URL is missing.");
+  if (!target && process.env.VERCEL) throw new Error("DATABASE_URL is missing.");
   const t = startTimer();
-  const db = url ? await postgresDb(url, "public") : await pgliteDb("pglite");
+  const db = target ? await postgresDb(target, "public") : await pgliteDb("pglite");
   const connect = t.lap();
   const catalog = await ensureSettings(db);
   const settings = t.lap();
   // Staging only: sample data + demo logins for testing. Never on Vercel's production env.
   const seeding =
-    process.env.SEED_DEMO === "1" && (!url || process.env.VERCEL_ENV !== "production");
+    process.env.SEED_DEMO === "1" && (!target || process.env.VERCEL_ENV !== "production");
   if (seeding) await seedDemo(db);
   logStart("real", t, { connect, settings, catalog, seed: t.lap() });
   return db;
@@ -102,9 +108,9 @@ async function seedDemo(db: Database): Promise<void> {
 }
 
 async function connectPractice(): Promise<Database> {
-  const url = process.env.DATABASE_URL;
+  const target = practiceDeskTarget(dbEnv());
   const t = startTimer();
-  const db = url ? await postgresDb(url, "practice") : await pgliteDb("practice");
+  const db = target ? await postgresDb(target, "practice") : await pgliteDb("practice");
   const connect = t.lap();
   const catalog = await ensureSettings(db);
   const settings = t.lap();
@@ -128,16 +134,15 @@ async function pgliteDb(folder: string): Promise<Database> {
   return db;
 }
 
-async function postgresDb(url: string, pgSchema: "public" | "practice"): Promise<Database> {
+async function postgresDb(target: DbTarget, pgSchema: "public" | "practice"): Promise<Database> {
   const { drizzle } = await import("drizzle-orm/postgres-js");
   const postgres = (await import("postgres")).default;
-  const client = postgres(url, {
+  // Pool sizes and which pooler each desk uses: lib/db-target.ts.
+  const client = postgres(target.url, {
+    // Required on the transaction pooler: a prepared statement doesn't survive the transaction.
     prepare: false,
-    // Supabase's session pooler allows ~15 clients in all, shared by every Vercel instance plus
-    // local dev. So each instance takes few (real desk 3, rarely used practice desk 2) and hands
-    // idle ones back after 20 s, so a new instance never waits out connect_timeout for a slot.
-    // Raise these only with a bigger plan.
-    max: pgSchema === "public" ? 3 : 2,
+    max: target.max,
+    // Hand idle connections back after 20 s, so a quiet instance doesn't hold pooler slots.
     idle_timeout: 20,
     // Recycle each connection every 30 min so a pooler restart never leaves a dead socket for long.
     max_lifetime: 60 * 30,
@@ -145,7 +150,9 @@ async function postgresDb(url: string, pgSchema: "public" | "practice"): Promise
     connection: {
       statement_timeout: 15_000,
       application_name: "transport-desk",
-      search_path: pgSchema,
+      // Only the session pooler keeps this for the connection's life; the practice desk relies on
+      // it and checks it below. The real desk uses the default schema (public).
+      ...(pgSchema === "practice" ? { search_path: pgSchema } : {}),
     },
   });
   if (pgSchema === "practice") {
