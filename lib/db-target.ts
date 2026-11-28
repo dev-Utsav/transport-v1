@@ -70,20 +70,6 @@ function withoutPoolUrl(env: DbEnv, sessionUrl: string): DbTarget {
 }
 
 /**
- * Queries postgres.js may queue on one connection before it waits for a reply (`max_pipeline`).
- *
- * With more parallel queries than connections, postgres.js pipelines them, and Supavisor's
- * transaction mode loses some replies: the backup's 15 reads on 3 connections hung until Vercel's
- * 300 s timeout (2026-11-28, reproduced on staging; 0 = fine 3 runs out of 3). 0 = one query at a
- * time per connection; extra queries wait in postgres.js for a free one. The session pooler gives
- * each connection its own server connection, so it keeps postgres.js's default, 100. (Always a
- * number: postgres.js reads a present `undefined` as the value, and `n < undefined` is false.)
- */
-export function maxPipeline(mode: DbTarget["mode"]): number {
-  return mode === "transaction" ? 0 : 100;
-}
-
-/**
  * Idle connections close after this many seconds (postgres.js `idle_timeout`).
  *
  * Vercel pauses an instance between requests. A paused instance can't run that timer, so its

@@ -44,19 +44,14 @@ describe("no connection left open while Vercel pauses an instance (slow clicks, 
   });
 });
 
-describe("one query per connection on the transaction pooler (backup 504, 2026-11-28)", () => {
-  // 15 parallel reads on 3 connections: postgres.js pipelined them and Supavisor's transaction
-  // mode lost replies, so queries waited until Vercel's 300 s timeout. Reproduced on staging.
-  it("the transaction pooler gets no pipelining; the session pooler keeps the default", async () => {
-    const { maxPipeline } = await import("@/lib/db-target");
-    expect(maxPipeline("transaction")).toBe(0);
-    expect(maxPipeline("session")).toBe(100);
-  });
-
-  it("the database module passes it to postgres.js", async () => {
+describe("transactions work on the live driver (every save failed, 2026-11-28)", () => {
+  // max_pipeline: 0 (PR #4) skips postgres.js's onexecute, so sql.begin never reserves its
+  // connection and every transaction rejects with UNSAFE_TRANSACTION (reproduced on staging).
+  // The integrated tests run on PGlite, not postgres.js, so they can't see it: keep the default.
+  it("the database module leaves postgres.js's pipelining at its default", async () => {
     const { readFileSync } = await import("node:fs");
     const src = readFileSync("server/db/index.ts", "utf8");
-    expect(src).toMatch(/max_pipeline:\s*maxPipeline\(target\.mode\)/);
+    expect(src).not.toMatch(/max_pipeline/);
   });
 });
 
