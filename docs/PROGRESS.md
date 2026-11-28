@@ -2,6 +2,17 @@
 
 Newest entry at the top. Rules: `../CLAUDE.md`. Client brief: `Transport Management System Feature Document.docx` (this folder).
 
+## 2026-11-28: Settings → Download backup timed out on live (504, 300 s) (branch `fix/db-no-pipeline-on-pooler`)
+
+- **Seen on live:** `GET /api/backup` → 504 `FUNCTION_INVOCATION_TIMEOUT`; the same request logged `[db] real desk ready in 60 ms`, so the wait was inside `exportAll()` (15 parallel reads).
+- **Reproduced on staging** (Singapore, transaction pooler 6543, the live desk's postgres.js options): 15 parallel reads on 3 connections hung past 60 s, 2 runs out of 2; one at a time they took 8.6 s; with 15 connections 5.1 s. With more queries than connections postgres.js **pipelines** them, and Supavisor's transaction mode loses replies. Nothing ends the wait: the `statement_timeout` startup parameter is ignored through the pooler (seen again: a 20 s setting waited 60+ s).
+- **Fix:** `max_pipeline: 0` on the transaction pooler (`maxPipeline`, `lib/db-target.ts`): one query at a time per connection, the rest wait in postgres.js. The session pooler keeps 100. postgres.js reads a present `undefined` as the value, so it is always a number; its types omit the option (`PoolOptions` in `server/db/index.ts`). Test: `tests/unit/db-target.test.ts`.
+- **Verified on staging:** probe 9 of 9 runs complete (4–13 s from here); the app's `/api/backup` (production build, transaction pooler) 8 of 9 complete with every table. `pg_stat_activity` showed Postgres idle throughout: the time is in the pooler, not in queries.
+- **Not explained yet:** one app run (before the diagnostics were added) waited past 120 s with the fix in. Also seen from here: `CONNECT_TIMEOUT` opening pooler connections (Singapore from India; refused cleanly within 10 s, may not apply from bom1 → Mumbai).
+- **Same cause likely behind** the unexplained 300 s hangs on `/`, `/new`, `/trips/new`, `/challans/new` (2026-11-27): any screen with more than 3 reads at once. To confirm after deploy.
+- **To do:** deploy, then download a backup on live and open those screens after 10 min idle; run the `alter role … statement_timeout` from 2026-11-27 (still open).
+- **Backup missed the advances khata, fixed:** `exportAll` left out `staff_advances` since that table was added, so every backup so far lacks it (download a fresh one after deploy). Now in the export. `tests/integrated/backup.test.ts` fails if any schema table is missing from the backup (only `backups` and `permissions`, rebuilt from code, are left out on purpose), plus a row check for advances. No restore code exists yet; when it is written, it must read `staffAdvances` too.
+
 ## 2026-11-27 (night): the guided tour follows the screen (Utsav's tour/ screenshots)
 
 ### What was wrong (reproduced locally, all of it)

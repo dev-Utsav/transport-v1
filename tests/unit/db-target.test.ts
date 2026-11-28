@@ -44,6 +44,22 @@ describe("no connection left open while Vercel pauses an instance (slow clicks, 
   });
 });
 
+describe("one query per connection on the transaction pooler (backup 504, 2026-11-28)", () => {
+  // 15 parallel reads on 3 connections: postgres.js pipelined them and Supavisor's transaction
+  // mode lost replies, so queries waited until Vercel's 300 s timeout. Reproduced on staging.
+  it("the transaction pooler gets no pipelining; the session pooler keeps the default", async () => {
+    const { maxPipeline } = await import("@/lib/db-target");
+    expect(maxPipeline("transaction")).toBe(0);
+    expect(maxPipeline("session")).toBe(100);
+  });
+
+  it("the database module passes it to postgres.js", async () => {
+    const { readFileSync } = await import("node:fs");
+    const src = readFileSync("server/db/index.ts", "utf8");
+    expect(src).toMatch(/max_pipeline:\s*maxPipeline\(target\.mode\)/);
+  });
+});
+
 describe("practice desk never uses Supabase's direct host (Take the tour: ENOTFOUND, 2026-11-27)", () => {
   const direct = "postgres://postgres:p@db.abcdefghijklmnop.supabase.co:5432/postgres";
   const poolUser =
