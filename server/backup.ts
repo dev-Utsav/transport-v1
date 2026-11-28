@@ -9,7 +9,11 @@ import * as schema from "@/server/db/schema";
 
 const KEEP = 30;
 
-/** Every table except the backups themselves, as one JSON document (photos as base64). */
+/**
+ * Every table except the backups themselves and the permission catalog (rebuilt from
+ * lib/access.ts on start), as one JSON document (photos as base64). A new table must be added
+ * here: tests/integrated/backup.test.ts fails otherwise.
+ */
 export async function exportAll(): Promise<string> {
   const db = await getDb();
   const [
@@ -23,6 +27,7 @@ export async function exportAll(): Promise<string> {
     expenses,
     billPhotos,
     salaryMonths,
+    staffAdvances,
     auditLog,
     users,
     roles,
@@ -39,6 +44,7 @@ export async function exportAll(): Promise<string> {
     db.select().from(schema.expenses),
     db.select().from(schema.billPhotos),
     db.select().from(schema.salaryMonths),
+    db.select().from(schema.staffAdvances),
     db.select().from(schema.auditLog),
     // Password hashes stay out of the backup file: after a restore the owner resets passwords.
     db
@@ -71,6 +77,7 @@ export async function exportAll(): Promise<string> {
       expenses,
       billPhotos: billPhotos.map((p) => ({ ...p, data: Buffer.from(p.data).toString("base64") })),
       salaryMonths,
+      staffAdvances,
       auditLog,
       users,
       roles,
