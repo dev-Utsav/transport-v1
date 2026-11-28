@@ -5,12 +5,13 @@ import path from "node:path";
 
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import { after } from "next/server";
-import type { Sql } from "postgres";
+import type { Options, Sql } from "postgres";
 import { cache } from "react";
 
 import {
   HOLD_AWAKE_MS,
   IDLE_CLOSE_SECONDS,
+  maxPipeline,
   practiceDeskTarget,
   realDeskTarget,
   type DbEnv,
@@ -158,14 +159,18 @@ async function pgliteDb(folder: string): Promise<Database> {
   return db;
 }
 
+/** postgres.js reads `max_pipeline` (src/index.js) but its types leave it out. */
+type PoolOptions = Options<Record<string, never>> & { max_pipeline: number };
+
 async function postgresDb(target: DbTarget, pgSchema: "public" | "practice"): Promise<Database> {
   const { drizzle } = await import("drizzle-orm/postgres-js");
   const postgres = (await import("postgres")).default;
   // Pool sizes and which pooler each desk uses: lib/db-target.ts.
-  const client = postgres(target.url, {
+  const options: PoolOptions = {
     // Required on the transaction pooler: a prepared statement doesn't survive the transaction.
     prepare: false,
-    max: target.max,
+    // Transaction pooler: no pipelining, it loses replies (lib/db-target.ts, maxPipeline).
+    max_pipeline: maxPipeline(target.mode),    max: target.max,
     // Close idle connections soon; each request stays awake until they have (holdAwakeUntilIdle).
     idle_timeout: IDLE_CLOSE_SECONDS,
     // Recycle each connection every 30 min so a pooler restart never leaves a dead socket for long.
@@ -178,7 +183,8 @@ async function postgresDb(target: DbTarget, pgSchema: "public" | "practice"): Pr
       // it and checks it below. The real desk uses the default schema (public).
       ...(pgSchema === "practice" ? { search_path: pgSchema } : {}),
     },
-  });
+  };
+  const client = postgres(target.url, options);
   if (pgSchema === "practice") {
     // Hard stop: practice must never write into the real tables. If the pooler drops the
     // search_path, refuse instead of falling back to public.
