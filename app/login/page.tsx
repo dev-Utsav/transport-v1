@@ -40,6 +40,8 @@ export default async function LoginPage({
               pending: t.common.saving,
               wrong: t.login.wrong,
               tooMany: t.login.tooMany,
+              failed: t.login.failed,
+              errorRef: t.common.errorRef,
               login: t.login.login,
             }}
           />
