@@ -12,13 +12,17 @@ import { getActor, secret } from "@/server/auth";
 import { getRealDb } from "@/server/db";
 import { roles, userRoles, users } from "@/server/db/schema";
 import { env } from "@/server/env";
+import { guardSession } from "@/server/guard";
+import type { Failed } from "@/server/guard";
 import { LANG_COOKIE } from "@/server/lang";
 
-export type LoginState = { error: "wrong" | "tooMany" | null };
+/** `failure` + `ref`: the save itself failed (database), shown like any other form's failure. */
+type MayFail = Partial<Failed>;
+export type LoginState = { error: "wrong" | "tooMany" | null } & MayFail;
 export type SetupState = {
   error: "key" | "login" | "password" | "mismatch" | "done" | "tooMany" | null;
-};
-export type PasswordState = { error: "wrong" | "password" | "mismatch" | null };
+} & MayFail;
+export type PasswordState = { error: "wrong" | "password" | "mismatch" | null } & MayFail;
 
 // Best-effort brake on password guessing, per server instance: 5 tries a minute for one login
 // name from one IP, 30 a minute from one IP in all (an office shares one IP).
@@ -70,6 +74,10 @@ async function startSession(user: { id: number; sessionVersion: number }): Promi
 const DUMMY_HASH = hashPassword(crypto.randomUUID());
 
 export async function login(_prev: LoginState, formData: FormData): Promise<LoginState> {
+  return guardSession(() => signIn(formData));
+}
+
+async function signIn(formData: FormData): Promise<LoginState> {
   const ip = await clientIp();
   const login = String(formData.get("login") ?? "").trim();
   const now = Date.now();
@@ -111,6 +119,10 @@ const setupSchema = z.object({
  * Refused once any login exists, so the key is useless afterwards.
  */
 export async function setupFirstAdmin(_prev: SetupState, formData: FormData): Promise<SetupState> {
+  return guardSession(() => createFirstAdmin(formData));
+}
+
+async function createFirstAdmin(formData: FormData): Promise<SetupState> {
   if (isRateLimited(`setup:${await clientIp()}`, Date.now())) return { error: "tooMany" };
   const parsed = setupSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
@@ -153,6 +165,10 @@ export async function changePassword(
   _prev: PasswordState,
   formData: FormData,
 ): Promise<PasswordState> {
+  return guardSession(() => saveNewPassword(formData));
+}
+
+async function saveNewPassword(formData: FormData): Promise<PasswordState> {
   const actor = await getActor();
   if (!actor) redirect("/login", RedirectType.replace);
   const parsed = changeSchema.safeParse(Object.fromEntries(formData));

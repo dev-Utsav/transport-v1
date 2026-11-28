@@ -59,6 +59,25 @@ describe("first run: the setup key creates the first admin, once", () => {
     const again = await setupFirstAdmin({ error: null }, form({ ...fields, key: "setup-key-123" }));
     expect(again.error).toBe("done");
   });
+
+  it("a database failure comes back as a message with a reference, no login created", async () => {
+    const { db } = testDb();
+    // The error live threw for every transaction while max_pipeline was 0 (PR #4, 2026-11-28).
+    const unsafe = Object.assign(new Error("UNSAFE_TRANSACTION: Only use sql.begin"), {
+      code: "UNSAFE_TRANSACTION",
+    });
+    const spy = vi.spyOn(db, "transaction").mockRejectedValueOnce(unsafe);
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const out = await setupFirstAdmin({ error: null }, form({ ...fields, key: "setup-key-123" }));
+    expect(out).toEqual({
+      error: null,
+      failure: "server",
+      ref: expect.stringMatching(/^[0-9a-f]{8}$/),
+    });
+    expect(await needsFirstAdmin()).toBe(true);
+    spy.mockRestore();
+    log.mockRestore();
+  });
 });
 
 describe("signing in", () => {

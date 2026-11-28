@@ -14,16 +14,18 @@ const INPUT =
 export function SetupForm({ t }: { t: Pick<Strings, "login" | "common"> }) {
   const [state, action] = useActionState<SetupState, FormData>(setupFirstAdmin, { error: null });
   const l = t.login;
-  const message = state.error
-    ? {
-        key: l.errKey,
-        login: l.errLogin,
-        password: l.errPassword,
-        mismatch: l.errMismatch,
-        done: l.errDone,
-        tooMany: l.tooMany,
-      }[state.error]
-    : null;
+  const message = state.failure
+    ? t.common.saveFailed[state.failure]
+    : state.error
+      ? {
+          key: l.errKey,
+          login: l.errLogin,
+          password: l.errPassword,
+          mismatch: l.errMismatch,
+          done: l.errDone,
+          tooMany: l.tooMany,
+        }[state.error]
+      : null;
   const fields = [
     { name: "key", label: l.setupKey, type: "password", auto: "off" },
     { name: "name", label: l.yourName, type: "text", auto: "name" },
@@ -55,6 +57,11 @@ export function SetupForm({ t }: { t: Pick<Strings, "login" | "common"> }) {
       ))}
       <p role="alert" className="min-h-5 text-[14px] font-semibold text-due">
         {message}
+        {state.ref ? (
+          <span className="mt-1 block font-mono text-[13px] font-normal">
+            {t.common.errorRef} {state.ref}
+          </span>
+        ) : null}
       </p>
       <SubmitButton label={l.setupSubmit} pendingLabel={t.common.saving} className="w-full" />
     </form>

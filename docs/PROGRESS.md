@@ -2,7 +2,25 @@
 
 Newest entry at the top. Rules: `../CLAUDE.md`. Client brief: `Transport Management System Feature Document.docx` (this folder).
 
+## 2026-11-28 (night): every save on live failed after PR #4; Change password "Something went wrong" (branch `fix/transactions-session-errors`)
+
+- **Seen on live (Utsav):** Change password → "Something went wrong" right after PR #4 was deployed by hand.
+- **Cause (reproduced on staging):** PR #4's `max_pipeline: 0` broke **every transaction**. postgres.js calls `onexecute` (which reserves the connection for `sql.begin`) only when `sent.length < max_pipeline`; with 0 that is never true, so Drizzle's `BEGIN` went out on a shared connection and postgres.js refused it: `UNSAFE_TRANSACTION: Only use sql.begin, sql.reserved or max: 1`, in about 3 s. Every write runs in a transaction: guarded forms showed "Couldn't save", Change password (unguarded) hit the error screen. Not caught because integrated tests run on PGlite, not postgres.js, and PR #4 was verified with reads only.
+- **Staging matrix (5 rounds each, pool of 3):** default pipelining: transaction 5/5 ok, 15 parallel reads 0/5 (hang > 45 s); `max_pipeline: 1`: transaction 3/5, 15 parallel 0/5; `0`: transaction always fails. So pipelining can't be tuned on Supavisor's transaction mode: avoid many parallel queries instead.
+- **Fix:**
+  - `max_pipeline` removed (back to postgres.js's default, as before PR #4); `tests/unit/db-target.test.ts` fails if `server/db/index.ts` sets it again.
+  - Backup reads every table **one after another in one read-only repeatable-read transaction** (`exportAll`): one connection, nothing to pipeline, and one consistent moment for all tables.
+  - Backups always read the **real desk** (`getRealDb`), also on the practice desk; before, `exportAll`, `takeBackup`, `listBackups` and `/api/backup/[id]` used `getDb()`, so a download on the practice desk gave sample data (CLAUDE.md §7b says backups always use the real one).
+  - Sign-in forms (`login`, `setupFirstAdmin`, `changePassword`) run in `guardSession` (`server/guard.ts`, shares the logging with `guardForm`): a failure comes back as the same "Couldn't save" message + reference as other forms (sign in has its own line, `login.failed`, en + hi), never the error screen.
+- **Tests (each failed on the live code, pass now):** `tests/integrated/password.test.ts` (change password saves, signs out other devices, audit; refusals; live error → message + ref; sign-in failure), `tests/integrated/users.test.ts` (setup failure), `tests/integrated/backup.test.ts` (one read-only snapshot; real desk while on practice), `tests/unit/db-target.test.ts`.
+- **Verified on staging with the real driver and pooler:** a write transaction (no-op `update settings set id = id`) 5/5 in about 220 ms; the snapshot read 5/5 in about 1.5 s; the app's `/api/backup` (production build) 6/6 in 1.5–1.8 s with every table. `pnpm check` green (176 tests).
+- **Gap that let it through, still open:** no automated test runs postgres.js against real Postgres. Worth a small read-only smoke script against staging before each deploy (transaction + backup).
+- **Still open (found, not fixed):** one-tap actions (deliver, advance trip, load / unload, cancel challan / payment / expense / advance, hide master / party, add category, set status) are not guarded: a database failure shows the error screen instead of a message. Needs a pattern for actions without form state (redirect back with a message).
+- **Utsav:** the admin password was pasted in the chat: change it once this is deployed.
+
 ## 2026-11-28: Settings → Download backup timed out on live (504, 300 s) (branch `fix/db-no-pipeline-on-pooler`)
+
+> **Superseded (same night):** the `max_pipeline: 0` fix below broke every transaction on live. See the entry above; the backup now reads in one sequential transaction instead.
 
 - **Seen on live:** `GET /api/backup` → 504 `FUNCTION_INVOCATION_TIMEOUT`; the same request logged `[db] real desk ready in 60 ms`, so the wait was inside `exportAll()` (15 parallel reads).
 - **Reproduced on staging** (Singapore, transaction pooler 6543, the live desk's postgres.js options): 15 parallel reads on 3 connections hung past 60 s, 2 runs out of 2; one at a time they took 8.6 s; with 15 connections 5.1 s. With more queries than connections postgres.js **pipelines** them, and Supavisor's transaction mode loses replies. Nothing ends the wait: the `statement_timeout` startup parameter is ignored through the pooler (seen again: a 20 s setting waited 60+ s).

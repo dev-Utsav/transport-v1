@@ -5,7 +5,7 @@ import { redirect, unstable_rethrow } from "next/navigation";
 
 import { classifyFailure, errorCode } from "@/lib/failure";
 import { formValues } from "@/lib/form";
-import type { FormState } from "@/lib/form";
+import type { FormState, SaveFailure } from "@/lib/form";
 import { AccessError } from "@/server/auth";
 
 /** Every screen reads live totals, so one write refreshes the whole desk. */
@@ -32,9 +32,33 @@ export async function guardForm(
     if (err instanceof AccessError && err.reason === "signedOut") redirect("/login");
     const values = formValues(formData);
     if (err instanceof AccessError) return { ok: false, errors: {}, values, failure: "denied" };
-    const ref = crypto.randomUUID().slice(0, 8);
-    const failure = classifyFailure(errorCode(err));
-    console.error(`[save failed] ref=${ref} failure=${failure}`, err);
-    return { ok: false, errors: {}, values, failure, ref };
+    return { ok: false, errors: {}, values, ...logFailure(err) };
+  }
+}
+
+/** A failed save as the person sees it: what it means, and a reference to the server log. */
+export type Failed = { failure: SaveFailure; ref: string };
+
+/** Logs the real error next to a short reference; only the reference reaches the browser. */
+function logFailure(err: unknown): Failed {
+  const ref = crypto.randomUUID().slice(0, 8);
+  const failure = classifyFailure(errorCode(err));
+  console.error(`[save failed] ref=${ref} failure=${failure}`, err);
+  return { failure, ref };
+}
+
+/**
+ * guardForm for the sign-in forms (login, first admin, change password), which keep their own
+ * small state instead of FormState: a failure comes back as `{ error: null, failure, ref }`
+ * instead of replacing the screen. redirect() passes through.
+ */
+export async function guardSession<S extends { error: string | null }>(
+  save: () => Promise<S>,
+): Promise<S | ({ error: null } & Failed)> {
+  try {
+    return await save();
+  } catch (err) {
+    unstable_rethrow(err);
+    return { error: null, ...logFailure(err) };
   }
 }

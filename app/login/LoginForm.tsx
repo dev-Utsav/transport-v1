@@ -21,11 +21,18 @@ export function LoginForm({
     pending: string;
     wrong: string;
     tooMany: string;
+    failed: string;
+    errorRef: string;
   };
 }) {
   const [state, action] = useActionState<LoginState, FormData>(login, { error: null });
-  const error =
-    state.error === "wrong" ? labels.wrong : state.error === "tooMany" ? labels.tooMany : null;
+  const error = state.failure
+    ? labels.failed
+    : state.error === "wrong"
+      ? labels.wrong
+      : state.error === "tooMany"
+        ? labels.tooMany
+        : null;
   return (
     <form action={action} className="grid gap-4">
       <input type="hidden" name="next" value={next} />
@@ -63,6 +70,11 @@ export function LoginForm({
         />
         <p id="login-error" role="alert" className="min-h-5 text-[14px] font-semibold text-due">
           {error}
+          {state.ref ? (
+            <span className="mt-1 block font-mono text-[13px] font-normal">
+              {labels.errorRef} {state.ref}
+            </span>
+          ) : null}
         </p>
       </div>
       <SubmitButton label={labels.submit} pendingLabel={labels.pending} className="w-full" />

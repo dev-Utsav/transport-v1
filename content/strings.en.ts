@@ -84,6 +84,7 @@ export const en = {
     login: "Login name",
     wrong: "Wrong login name or password.",
     tooMany: "Too many tries. Wait a minute and try again.",
+    failed: "Couldn't sign in just now (server). Try again in a minute.",
     setupTitle: "Set up the first admin",
     setupHelp:
       "First time on this desk. Type the setup key you were given, then choose the admin's login.",

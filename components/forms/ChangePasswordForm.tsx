@@ -12,8 +12,9 @@ export function ChangePasswordForm({ t }: { t: Pick<Strings, "common" | "account
   const [state, action] = useActionState<PasswordState, FormData>(changePassword, {
     error: null,
   });
-  const message =
-    state.error === "wrong"
+  const message = state.failure
+    ? t.common.saveFailed[state.failure]
+    : state.error === "wrong"
       ? t.account.wrong
       : state.error === "mismatch"
         ? t.login.errMismatch
@@ -55,6 +56,11 @@ export function ChangePasswordForm({ t }: { t: Pick<Strings, "common" | "account
       </Field>
       <p role="alert" className="min-h-5 text-[14px] font-semibold text-due">
         {message}
+        {state.ref ? (
+          <span className="mt-1 block font-mono text-[13px] font-normal">
+            {t.common.errorRef} {state.ref}
+          </span>
+        ) : null}
       </p>
       <SubmitButton
         label={t.account.submit}
